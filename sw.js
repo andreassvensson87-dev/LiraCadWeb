@@ -1,5 +1,5 @@
-const CACHE = "liracad-" + "f2107b9e4daa1668";
-const FILES = ["index.html","app.js","core.js","dimensions.js","dxf-layout.js","editing.js","grips.js","layout.js","navigation.js","plot.js","pwa.js","snapping.js","style.css","text.js","tracking.js","trim-extend.js","manifest.webmanifest","icon-192.png","icon-512.png"];
+const CACHE = "liracad-" + "222cf4d9e2e2041d";
+const FILES = ["index.html","src/app.js","src/core.js","src/dimensions.js","src/dxf-layout.js","src/editing.js","src/grips.js","src/layout.js","src/navigation.js","src/plot.js","src/pwa.js","src/snapping.js","src/style.css","src/text.js","src/tracking.js","src/trim-extend.js","manifest.webmanifest","icon-192.png","icon-512.png"];
 const urls = FILES.map(file => new URL(file, self.registration.scope).href);
 self.addEventListener("install", event => {
  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(urls)));

@@ -109,22 +109,48 @@ Kedjemått: markera en måttkedja eller ett äldre linjärt/riktat mått och sta
 TR / TRIM och EX / EXTEND finns under Redigera. Välj gränser och tryck Enter (utan val används alla lämpliga objekt i aktuellt utrymme). Klicka delen som ska bort för TRIM, eller nära änden som ska förlängas för EXTEND. Förhandsvisning visar resultatet; fortsätt klicka och avsluta med Enter/Escape. Varje klick kan ångras. Linjer, bågar och raka polylinjer stöds som mål; cirklar fungerar också som gränser. Slutna polylinjer öppnas vid trimning och kan inte förlängas. Gränser måste verkligen skära målet eller dess förlängning; ingen imaginär förlängning av gränserna används.
 
 
-## Installerbar webbapp / GitHub Pages
+## Git, säkerhetskopiering och automatisk publicering
 
-Publicerad app: https://andreassvensson87-dev.github.io/LiraCadWeb/
-Publikt releasearkiv: https://github.com/andreassvensson87-dev/LiraCadWeb
-GitHub Pages publicerar från `main`, rotmappen. Rotmappen innehåller det platta releasepaketet från `dist/`. Hela utvecklingsprojektet säkerhetskopieras i `source/` i samma arkiv. Första publicerade commit: `75f05b675a7344c50bc72bee5b2763f613228211`.
+Webbapp: https://andreassvensson87-dev.github.io/LiraCadWeb/
+Källkod: https://github.com/andreassvensson87-dev/LiraCadWeb
 
-### Återställ utvecklingsprojektet
+Projektets källkod ligger direkt i arkivets rot. Git-historiken bevarar tidigare
+releasefiler och kodbackuper. `dist/`, `node_modules`, lokala skärmbilder och
+`.env`-filer ingår inte i Git.
 
-Ladda hem arkivet via GitHub: Code → Download ZIP, packa upp och öppna mappen `source/`. Med Node.js 22 eller senare: kör `npm start` för utveckling, `npm run build` för release och `npm test` för tester. Inga npm-paket behöver installeras. `dist/` återskapas av byggskriptet. Ritningar och lokala skärmbilder ingår inte i kodbackupen.
+### Arbeta och publicera
 
-Vid framtida publicering: uppdatera både utvecklingsprojektet i `source/` och releasefilerna i arkivets rot. Varje GitHub-commit sparar versionshistoriken; ändringar som bara finns på datorn är inte säkerhetskopierade.
+```sh
+git status
+git add <filer-som-du-vill-spara>
+git commit -m "Beskriv ändringen"
+git push
+```
 
-Kör `npm run build` med Node 22 eller senare. Publicera innehållet i `dist/` på GitHub Pages (behåll alla filer inklusive `.nojekyll`). Mappen innehåller bara appfiler, inga ritningar eller skärmbilder. Relativa sökvägar stödjer en projektadress som `https://andreassvensson87-dev.github.io/LiraCadWeb/`. `noindex` finns i HTML; det är inte åtkomstskydd.
+Push till `main` sparar koden på GitHub och startar `.github/workflows/deploy.yml`.
+GitHub Actions testar och bygger appen, och publicerar enbart `dist/` via GitHub
+Pages. Pull requests kontrolleras utan publicering. Om kontrollerna misslyckas
+ligger den tidigare publicerade versionen kvar. Följ körningen under **Actions**.
+GitHub Pages använder **GitHub Actions** som källa, inte en mapp i `main`.
 
-Kör bygget igen vid varje uppdatering och publicera hela mappen tillsammans. Service worker får ett innehållsbaserat versionsnummer. Den nya versionen installeras bara om alla appfiler kan cachas. Knappen ”Ny version – uppdatera” sparar ritningen lokalt och aktiverar sedan den nya versionen. Andra öppna LiraCAD-fönster måste stängas först. Oavslutade ritkommandon/grepp ska slutföras före uppdatering. Ritningar laddas inte upp.
+### Återställ på en ny dator
 
-På Mac kan webbappen läggas till i Dock från Safari; Chromium kan erbjuda installation via appknappen. Installation och offlinelagring kan bero på webbläsaren. Spara projektfil innan byte från localhost: lokala ritningar överförs inte automatiskt till GitHub-adressen. Offline fungerar efter första lyckade cacheinstallationen. Browserlagring kan rensas; projektfiler behövs som backup.
+Installera Git och Node.js 22 eller senare (inklusive npm):
 
-Vanlig utveckling på localhost-rotadressen registrerar inte service worker. Testa releasepaketet på `/dist/`. Bygg före testkörningen: `npm run build && npm test`.
+```sh
+git clone https://github.com/andreassvensson87-dev/LiraCadWeb.git
+cd LiraCadWeb
+npm run build
+npm run check
+npm run dev
+```
+
+Ingen separat ZIP-backup eller manuell uppladdning behövs längre. Lokala ändringar
+är dock inte säkerhetskopierade förrän de har committats och pushats.
+Modeller, ritningar och bibliotek i webbläsarens lagring ingår inte i kodbackupen.
+
+### Installerbar webbapp
+
+Manifest, ikoner och offlinecache ingår i produktionsbygget. Appadressen och
+installationen behålls. Offline fungerar efter första lyckade cacheinstallationen.
+Webbläsarens lagring kan rensas och ersätter inte projektbackuper.
