@@ -32,3 +32,18 @@ geometri-, export-, block- och PWA-tester som regressionsskydd.
 
 Kontroll: `npm run build && npm run check`. Byggsteget tar automatiskt med
 nya src-moduler i release och offlinecache.
+
+## Andra etappen: presentation
+
+- `entity-renderer.js`: ritar enskilda objekt och deras delar till ett injicerat
+  canvas-context. Kamera, koordinatomvandling och lager slås upp genom callbacks,
+  så viewportbyte inte behåller gammal skala. Ingen DOM eller dokumentmutation.
+- `command-prompts.js`: rena kommandotexter utifrån verktygsfas och aktuella
+  standardvärden. Kommandonas geometriändringar finns fortfarande i app.js.
+- `inspector-controls.js`: gemensamma fält, val, knappar och färgdropdown.
+  Kontrollerna skickar värden till callbacks; de ändrar aldrig dokument själva.
+  Fälten behåller hantering av Enter/Escape, multiline och ändring/blur.
+
+Appen äger fortfarande scenrendering, overlays, kommandotillstånd och valet av
+objektspecifika inspectorfält. Nästa etapp kan flytta hela kommandon ett i taget;
+modulerna ovan ska inte få tillbaka beroenden på appens globala tillstånd.

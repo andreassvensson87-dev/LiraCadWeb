@@ -1,8 +1,16 @@
+import { createEntityRenderer } from "./entity-renderer.js";
+import { commandPrompt, advancedNames } from "./command-prompts.js";
+import { createInspectorControls } from "./inspector-controls.js";
+document.addEventListener("pointerdown", (ev) => {
+  document.querySelectorAll(".color-dropdown[open]").forEach((el) => {
+    if (!el.contains(ev.target)) el.open = false;
+  });
+});
 import { toDXF } from "./dxf-export.js";
 import { History } from "./history.js";
 import { readDrawingFile } from "./file-import.js";
 import { ProjectStorage } from "./project-storage.js";
-import { lineTypes, linePattern } from "./linetypes.js";
+import { lineTypes } from "./linetypes.js";
 import {
   attributeSchema,
   attributeOptions,
@@ -19,7 +27,7 @@ import {
   validBlockName,
   validTag,
 } from "./blocks.js";
-import { polylineParts, hasBulges } from "./polyline.js";
+import { hasBulges } from "./polyline.js";
 import { setupPWA } from "./pwa.js";
 import { trimExtend } from "./trim-extend.js";
 import { layoutSVG } from "./plot.js";
@@ -43,7 +51,7 @@ import {
   paperSnaps,
 } from "./layout.js";
 import { grips, gripTargets, moveGripTargets } from "./grips.js";
-import { textLines, textFont } from "./text.js";
+import { textFont } from "./text.js";
 import { TrackingReferences } from "./tracking.js";
 import { createSnapIndex, nearbySnaps, resolveSnap } from "./snapping.js";
 import { wheelNavigation, commandSubmitKey } from "./navigation.js";
@@ -260,6 +268,21 @@ const svg = (n) =>
   `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.3">${icons[n] || icons.LINE}</svg>`;
 const fmt = (n) =>
   Number(n.toFixed(2)).toLocaleString("sv-SE", { maximumFractionDigits: 2 });
+const { path, drawEntity } = createEntityRenderer({
+  ctx,
+  screen,
+  getCamera: () => camera,
+  layerOf,
+});
+const { field, section, choice, action, colorFields } = createInspectorControls(
+  {
+    document,
+    onInvalid: (message) => {
+      log(message);
+      renderInspector();
+    },
+  },
+);
 function log(s) {
   const el = document.createElement("div");
   el.textContent = s;
@@ -632,23 +655,6 @@ function make(type, props) {
     ...creationDefaults[type],
   };
 }
-const advancedNames = new Set([
-  "TRIM",
-  "EXTEND",
-  "JOIN",
-  "EXPLODE",
-  "PINSERT",
-  "PDELETE",
-  "FILLET",
-  "CHAMFER",
-  "DIMCONTINUE",
-  "DIMLINEAR",
-  "DIMALIGNED",
-  "DIMANGULAR",
-  "DIMRADIUS",
-  "DIMDIAMETER",
-  "MVIEW",
-]);
 let cornerSize = 0,
   chamferSize = 100;
 function selectedEntities() {
@@ -779,56 +785,6 @@ function setChainSource(entity, end = 1) {
   tool.phase = "chainPoints";
   selection = new Set([entity.id]);
   clearTracking();
-}
-function advancedPrompt() {
-  if (!tool || !advancedNames.has(tool.name)) return null;
-  const n = tool.name,
-    p = tool.points.length;
-  if (["TRIM", "EXTEND"].includes(n))
-    return tool.phase === "select"
-      ? "Välj gränser · Enter fortsätter (inga val = alla)"
-      : n === "TRIM"
-        ? "Klicka delen som ska bort · Enter avslutar"
-        : "Klicka nära änden som ska förlängas · Enter avslutar";
-  if (n === "DIMCONTINUE")
-    return tool.phase === "chainPick"
-      ? "Välj en måttkedja eller ett linjärt mått · Enter avslutar"
-      : "Lägg till mätpunkt · [Byt ände/Välj mått] · Enter avslutar";
-  if (["DIMLINEAR", "DIMALIGNED"].includes(n))
-    return tool.phase === "dimensionPlace"
-      ? "Placera hela måttlinjen"
-      : p
-        ? `Ange nästa mätpunkt · ${p} valda · Enter placerar måttlinjen`
-        : "Ange första mätpunkten";
-  if (tool.phase === "select") return "Välj objekt · Enter fortsätter";
-  if (tool.phase === "cornerSize")
-    return n === "FILLET"
-      ? `Ange radie <${cornerSize}> · 0 ger skarpt hörn`
-      : `Ange fasavstånd <${chamferSize}> eller två avstånd: 100,200`;
-  if (["FILLET", "CHAMFER"].includes(n))
-    return tool.first
-      ? "Välj andra linjen på sidan som ska behållas"
-      : "Välj första linjen på sidan som ska behållas";
-  if (n === "PINSERT") return "Klicka ny hörnpunkt vid önskat segment";
-  if (n === "PDELETE") return "Klicka hörnpunkten som ska tas bort";
-  if (n === "MVIEW")
-    return p
-      ? "Ange viewportens motsatta hörn"
-      : "Ange viewportens första hörn";
-  if (n === "DIMANGULAR")
-    return [
-      "Ange vinkelns spets",
-      "Ange första riktningen",
-      "Ange andra riktningen",
-      "Placera vinkelmåttet",
-    ][p];
-  if (["DIMRADIUS", "DIMDIAMETER"].includes(n))
-    return p ? "Placera måtttexten" : "Välj cirkel eller båge";
-  return [
-    "Ange första måttpunkten",
-    "Ange andra måttpunkten",
-    "Placera måttlinjen",
-  ][p];
 }
 function dimensionEntity(points) {
   const kinds = {
@@ -1301,155 +1257,6 @@ function resize() {
   schedule();
 }
 new ResizeObserver(resize).observe(canvas);
-function path(points, close = false) {
-  ctx.beginPath();
-  points.forEach((p, i) => {
-    const s = screen(p);
-    i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y);
-  });
-  if (close) ctx.closePath();
-}
-function drawEntity(e, color, selected = false, preview = false) {
-  if (e.type === "block") {
-    for (const part of blockParts(e)) {
-      if (layerOf(part)?.visible !== false)
-        drawEntity(
-          part,
-          selected || preview
-            ? color
-            : part.color || layerOf(part)?.color || color,
-          selected,
-          preview,
-        );
-    }
-    return;
-  }
-  if (hasBulges(e)) {
-    for (const part of polylineParts(e))
-      drawEntity(part, color, selected, preview);
-    return;
-  }
-  if (e.type === "dimension") {
-    for (const part of dimensionParts(e))
-      drawEntity(part, color, selected, preview);
-    return;
-  }
-  if (e.type === "viewport") {
-    drawEntity(
-      { ...e, type: "polyline", points: pointsOf(e), closed: true },
-      color,
-      selected,
-      preview,
-    );
-    return;
-  }
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = selected ? 1.8 : 1.15;
-  ctx.setLineDash(
-    preview
-      ? [6, 4]
-      : linePattern(e, layerOf(e)).map((v) => Math.abs(v) * camera.scale),
-  );
-  if (e.type === "circle" || e.type === "arc") {
-    const c = screen(e.center);
-    ctx.beginPath();
-    ctx.arc(
-      c.x,
-      c.y,
-      e.radius * camera.scale,
-      e.type === "arc" ? -e.start : 0,
-      e.type === "arc" ? -(e.start + e.sweep) : TAU,
-      e.type === "arc" && e.sweep > 0,
-    );
-    ctx.stroke();
-  } else if (e.type === "text") {
-    const p = screen(e.point);
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(-(e.rotation || 0));
-    const size = e.height * camera.scale;
-    ctx.font = `${e.italic ? "italic " : ""}${e.bold ? "bold " : ""}${size}px "${textFont(e)}"`;
-    textLines(e.text).forEach((line, i) => {
-      const y = i * size * 1.4;
-      ctx.fillText(line, 0, y);
-      if (e.underline) {
-        ctx.beginPath();
-        ctx.lineWidth = Math.max(1, size / 16);
-        ctx.moveTo(0, y + size * 0.15);
-        ctx.lineTo(ctx.measureText(line).width, y + size * 0.15);
-        ctx.stroke();
-      }
-    });
-    ctx.restore();
-  } else {
-    path(e.points, e.closed || e.type === "hatch");
-    if (e.type === "hatch") {
-      ctx.save();
-      ctx.globalAlpha = 0.075;
-      ctx.fill();
-      ctx.restore();
-      ctx.save();
-      ctx.clip();
-      const b = bounds(e),
-        a = screen({ x: b.minX, y: b.maxY }),
-        z = screen({ x: b.maxX, y: b.minY }),
-        step = Math.max(5, e.spacing * camera.scale),
-        extent = Math.hypot(z.x - a.x, z.y - a.y);
-      ctx.translate((a.x + z.x) / 2, (a.y + z.y) / 2);
-      ctx.rotate(-(e.patternAngle ?? Math.PI / 4));
-      ctx.globalAlpha = 0.6;
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      for (let y = -extent; y < extent; y += step) {
-        ctx.moveTo(-extent, y);
-        ctx.lineTo(extent, y);
-      }
-      ctx.stroke();
-      ctx.restore();
-      path(e.points, true);
-      ctx.stroke();
-    } else ctx.stroke();
-    if (e.type === "leader") {
-      const a = screen(e.points[0]),
-        b = screen(e.points[1]),
-        ang = Math.atan2(b.y - a.y, b.x - a.x),
-        size = Math.max(
-          2,
-          Math.min(14, (e.height || 120) * 0.75 * camera.scale),
-        );
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(
-        a.x + size * Math.cos(ang - 0.32),
-        a.y + size * Math.sin(ang - 0.32),
-      );
-      ctx.lineTo(
-        a.x + size * Math.cos(ang + 0.32),
-        a.y + size * Math.sin(ang + 0.32),
-      );
-      ctx.closePath();
-      ctx.fill();
-      if (e.text)
-        drawEntity(
-          {
-            ...e,
-            type: "text",
-            point: add(e.points.at(-1), {
-              x: (e.height || 120) / 3,
-              y: ((e.height || 120) * 7) / 24,
-            }),
-            text: e.text,
-            height: e.height || 120,
-          },
-          color,
-          false,
-          preview,
-        );
-    }
-  }
-  ctx.setLineDash([]);
-}
 function gridStep() {
   const target = 65 / camera.scale,
     pow = 10 ** Math.floor(Math.log10(target));
@@ -1670,70 +1477,7 @@ function prompt() {
     snap = null;
     $("#snap-feedback").textContent = "";
   }
-  let s = "";
-  if (tool) {
-    const n = tool.name,
-      p = tool.points.length;
-    if (tool.phase === "select") s = "Välj objekt · Enter fortsätter";
-    else if (tool.phase === "blockName") s = "Ange ett unikt blocknamn";
-    else if (tool.phase === "insertName") s = "Ange blocknamn";
-    else if (tool.phase === "attributeName") s = "Attributnamn (t.ex. NUMMER)";
-    else if (n === "BLOCK") s = "Ange blockets baspunkt";
-    else if (n === "INSERT") s = "Ange insättningspunkt";
-    else if (n === "PLINE" && p)
-      s = tool.arcMode
-        ? tool.arcMid
-          ? "Ange bågens slutpunkt · L = linje"
-          : "Ange punkt på bågen · L = linje · Enter avslutar"
-        : "Nästa punkt · A = båge · C = slut · U = ångra · Enter avslutar";
-    else if (tool.phase === "text") s = "Skriv text och tryck Enter";
-    else if (n === "LINE" || n === "PLINE")
-      s = p
-        ? "Nästa punkt eller längd · Enter avslutar"
-        : "Ange första punkten";
-    else if (n === "RECTANG")
-      s = p ? "Ange motsatt hörn" : "Ange första hörnet";
-    else if (n === "CIRCLE") s = p ? "Ange radie eller klicka" : "Ange centrum";
-    else if (n === "ARC")
-      s = [
-        "Ange bågens startpunkt",
-        "Ange en punkt på bågen",
-        "Ange bågens slutpunkt",
-      ][p];
-    else if (n === "TEXT") s = "Ange textens insättningspunkt";
-    else if (n === "LEADER")
-      s = ["Ange pilspets", "Ange brytpunkt", "Ange textplacering"][p];
-    else if (n === "HATCH")
-      s = p
-        ? "Nästa hörn · Enter sluter ytan"
-        : "Ange första hörnet för skraffering";
-    else if (n === "MOVE" || n === "COPY")
-      s = p ? "Ange målpunkt eller avstånd" : "Ange baspunkt";
-    else if (n === "ROTATE")
-      s = p
-        ? "Ange vinkel i grader eller klicka riktning"
-        : "Ange rotationscentrum";
-    else if (n === "SCALE")
-      s = p
-        ? "Ange skalfaktor · mus: 1 000 mm = 1×"
-        : "Ange skalningens baspunkt";
-    else if (n === "MIRROR")
-      s = p
-        ? "Ange spegelaxelns andra punkt"
-        : "Ange spegelaxelns första punkt";
-    else if (n === "OFFSET")
-      s =
-        tool.phase === "distance"
-          ? p
-            ? "Ange mätningens slutpunkt eller skriv avstånd"
-            : "Ange avstånd i mm eller mätningens startpunkt"
-          : "Klicka på sidan för kopian";
-    else if (n === "DIST")
-      s = p ? "Ange mätningens slutpunkt" : "Ange mätningens startpunkt";
-    else if (n === "PAN") s = "Dra för att panorera · Esc avslutar";
-  }
-
-  s = advancedPrompt() || s;
+  const s = commandPrompt(tool, { cornerSize, chamferSize });
   $("#command-label").textContent = tool ? tool.name : "Kommando";
   input.placeholder = s || "Skriv ett kommando…";
   $("#status-mode").textContent = tool
@@ -3005,60 +2749,6 @@ function toggle(kind) {
   resolveCursor();
   schedule();
 }
-function field(label, value, change, type = "number") {
-  const wrapper = document.createElement("label");
-  wrapper.className = "field";
-  const text = document.createElement("span");
-  text.textContent = label;
-  wrapper.append(text);
-  const el = document.createElement(
-    type === "multiline" ? "textarea" : "input",
-  );
-  if (type !== "multiline") el.type = type;
-  else el.rows = 4;
-  if (type === "number") el.step = "any";
-  el.value = value;
-  wrapper.append(el);
-  let accepted = String(value);
-  const apply = () => {
-    if (el.value === accepted) return;
-    const v = type === "number" ? number(el.value) : el.value;
-    if (v === null) {
-      log("Ogiltigt värde.");
-      renderInspector();
-      return;
-    }
-    accepted = el.value;
-    change(v);
-  };
-  el.onchange = apply;
-  el.onblur = apply;
-  el.onkeydown = (ev) => {
-    if (
-      ev.key === "Enter" &&
-      (type !== "multiline" || ev.ctrlKey || ev.metaKey)
-    ) {
-      ev.preventDefault();
-      apply();
-      el.blur();
-    }
-    if (ev.key === "Escape") {
-      ev.stopPropagation();
-      el.value = accepted;
-      el.blur();
-    }
-  };
-  return wrapper;
-}
-function section(title) {
-  const el = document.createElement("div");
-  el.className = "inspector-section";
-  const h = document.createElement("div");
-  h.className = "section-title";
-  h.textContent = title;
-  if (title) el.append(h);
-  return el;
-}
 function layerSelect(onChange, value) {
   const label = document.createElement("label");
   label.className = "field";
@@ -3088,134 +2778,6 @@ function editSelected(label, fn) {
     );
   });
 }
-function choice(label, value, options, change) {
-  const wrap = document.createElement("label");
-  wrap.className = "field";
-  const title = document.createElement("span");
-  title.textContent = label;
-  const select = document.createElement("select");
-  for (const [value, label] of options) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = label;
-    select.append(option);
-  }
-  select.value = String(value);
-  select.onchange = () => change(select.value);
-  wrap.append(title, select);
-  return wrap;
-}
-function action(label, fn) {
-  const button = document.createElement("button");
-  button.className = "subtle-button";
-  button.textContent = label;
-  button.onclick = fn;
-  return button;
-}
-const standardColors = [
-  ["Röd", "#ff0000"],
-  ["Orange", "#ff8000"],
-  ["Gul", "#ffff00"],
-  ["Grön", "#00cc00"],
-  ["Cyan", "#00ffff"],
-  ["Blå", "#0000ff"],
-  ["Magenta", "#ff00ff"],
-  ["Vit", "#ffffff"],
-  ["Grå", "#808080"],
-  ["Svart", "#000000"],
-];
-function colorFields(root, value, layerColor, change) {
-  const standard = standardColors.find(
-    ([, color]) => color === value?.toLowerCase(),
-  );
-  const selected =
-    value === "mixed"
-      ? "mixed"
-      : !value
-        ? "layer"
-        : standard
-          ? standard[1]
-          : "custom";
-  const custom = document.createElement("div");
-  custom.hidden = selected !== "custom";
-  custom.append(
-    field(
-      "Egen kulör",
-      value && value !== "mixed" ? value : layerColor || "#ffffff",
-      change,
-      "color",
-    ),
-  );
-  const row = document.createElement("div");
-  row.className = "field";
-  const label = document.createElement("span");
-  label.textContent = "Färg";
-  const dropdown = document.createElement("details");
-  dropdown.className = "color-dropdown";
-  const trigger = document.createElement("summary");
-  trigger.setAttribute("aria-label", "Färg");
-  const menu = document.createElement("div");
-  menu.className = "color-menu";
-  const entries = [
-    ...(value === "mixed" ? [["mixed", "Blandat", null]] : []),
-    ["layer", "Enligt lager", layerColor],
-    ...standardColors.map(([name, color]) => [color, name, color]),
-    ["custom", "Egen kulör…", selected === "custom" ? value : null],
-  ];
-  const contents = (element, name, color) => {
-    const swatch = document.createElement("span");
-    swatch.className = "dropdown-swatch";
-    if (color) swatch.style.background = color;
-    swatch.setAttribute("aria-hidden", "true");
-    const text = document.createElement("span");
-    text.textContent = name;
-    element.append(swatch, text);
-  };
-  const current = entries.find(([key]) => key === selected);
-  contents(trigger, current[1], current[2]);
-  for (const [key, name, color] of entries) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.setAttribute("aria-pressed", String(key === selected));
-    contents(button, name, color);
-    button.onclick = () => {
-      dropdown.open = false;
-      if (key === "custom") {
-        custom.hidden = false;
-        custom.querySelector("input").focus();
-        return;
-      }
-      if (key !== "mixed") change(key === "layer" ? null : key);
-    };
-    menu.append(button);
-  }
-  dropdown.onkeydown = (ev) => {
-    ev.stopPropagation();
-    if (ev.key === "Escape") {
-      ev.preventDefault();
-      dropdown.open = false;
-      trigger.focus();
-    }
-    if (["ArrowDown", "ArrowUp"].includes(ev.key)) {
-      ev.preventDefault();
-      dropdown.open = true;
-      const buttons = [...menu.querySelectorAll("button")];
-      const index = buttons.indexOf(document.activeElement);
-      buttons[
-        (index + (ev.key === "ArrowDown" ? 1 : -1) + buttons.length) %
-          buttons.length
-      ].focus();
-    }
-  };
-  dropdown.append(trigger, menu);
-  row.append(label, dropdown);
-  root.append(row, custom);
-}
-document.addEventListener("pointerdown", (ev) => {
-  document.querySelectorAll(".color-dropdown[open]").forEach((el) => {
-    if (!el.contains(ev.target)) el.open = false;
-  });
-});
 function appearanceFields(root, e, change) {
   const positive = (key, value) => {
     if (value > 0) change(key, value);
