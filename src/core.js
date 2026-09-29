@@ -1,3 +1,12 @@
+import { lineTypes, validLineType } from "./linetypes.js";
+import { validAttributeSchema } from "./attributes.js";
+import {
+  splitDimension,
+  writeDimension,
+  dimensionStyles,
+} from "./dxf-dimensions.js";
+import { blockParts, validBlockName, validTag } from "./blocks.js";
+import { polylineParts, hasBulges } from "./polyline.js";
 import { dxfLayouts } from "./dxf-layout.js";
 import { polylineOffset } from "./editing.js";
 import { dimensionParts, validDimension } from "./dimensions.js";
@@ -74,6 +83,8 @@ export function onArc(e, a) {
     : mod(e.start - a) <= -e.sweep + 1e-8;
 }
 export function pointsOf(e) {
+  if (e.type === "block") return blockParts(e).flatMap(pointsOf);
+  if (hasBulges(e)) return polylineParts(e).flatMap(pointsOf);
   if (e.type === "dimension") return dimensionParts(e).flatMap(pointsOf);
   if (e.type === "viewport") {
     const [a, b] = e.points;
@@ -109,6 +120,17 @@ export function pointsOf(e) {
   return e.points || [];
 }
 export function bounds(e) {
+  if (e.type === "block" || hasBulges(e)) {
+    const bs = (e.type === "block" ? blockParts(e) : polylineParts(e)).map(
+      bounds,
+    );
+    return {
+      minX: Math.min(...bs.map((b) => b.minX)),
+      minY: Math.min(...bs.map((b) => b.minY)),
+      maxX: Math.max(...bs.map((b) => b.maxX)),
+      maxY: Math.max(...bs.map((b) => b.maxY)),
+    };
+  }
   let p = pointsOf(e);
   if (e.type === "circle")
     p = [
@@ -168,6 +190,12 @@ export function inside(p, poly) {
   return yes;
 }
 export function hitDistance(e, p) {
+  if (e.type === "block" || hasBulges(e))
+    return Math.min(
+      ...(e.type === "block" ? blockParts(e) : polylineParts(e)).map((part) =>
+        hitDistance(part, p),
+      ),
+    );
   if (e.type === "dimension")
     return Math.min(...dimensionParts(e).map((part) => hitDistance(part, p)));
   if (e.type === "circle") return Math.abs(dist(p, e.center) - e.radius);
@@ -209,6 +237,8 @@ export function hitDistance(e, p) {
   return d;
 }
 export function segments(e) {
+  if (e.type === "block") return blockParts(e).flatMap(segments);
+  if (hasBulges(e)) return polylineParts(e).flatMap(segments);
   if (e.type === "dimension") return dimensionParts(e).flatMap(segments);
   const p = pointsOf(e),
     s = [];
@@ -257,6 +287,12 @@ export function rectSelect(e, r, crossing) {
   );
 }
 export function snapPoints(e) {
+  if (e.type === "block")
+    return [
+      { p: e.point, kind: "Insättning" },
+      ...blockParts(e).flatMap(snapPoints),
+    ];
+  if (hasBulges(e)) return polylineParts(e).flatMap(snapPoints);
   if (e.type === "dimension")
     return e.points.map((p) => ({ p, kind: "Måttpunkt" }));
   if (e.type === "viewport")
@@ -295,6 +331,15 @@ export function transform(
 ) {
   const n = clone(e);
   if (n.points) n.points = n.points.map(fn);
+  if (n.type === "polyline" && mirror && n.bulges)
+    n.bulges = n.bulges.map((b) => -b);
+  if (n.type === "block") {
+    n.scale = (e.scale || 1) * Math.abs(scale);
+    n.rotation = mirror
+      ? rotation - (e.rotation || 0)
+      : (e.rotation || 0) + rotation;
+    n.mirrored = mirror ? !e.mirrored : !!e.mirrored;
+  }
   if (e.type === "dimension" && e.axis) {
     const a = fn(e.axis),
       o = fn({ x: 0, y: 0 }),
@@ -432,6 +477,26 @@ export function validDocument(d) {
       ))
   )
     return false;
+  if (
+    d.blocks != null &&
+    (!Array.isArray(d.blocks) ||
+      d.blocks.length > 10000 ||
+      !validDocument({
+        version: 1,
+        layers: d.layers,
+        entities: d.blocks.map((definition) => ({
+          id: definition?.id,
+          type: "block",
+          layer: d.layers[0]?.id,
+          point: { x: 0, y: 0 },
+          scale: 1,
+          rotation: 0,
+          definition,
+          values: {},
+        })),
+      }))
+  )
+    return false;
   const ids = new Set(),
     ls = new Set();
   for (const l of d.layers) {
@@ -443,6 +508,7 @@ export function validDocument(d) {
       !/^#[\da-f]{6}$/i.test(l.color)
     )
       return false;
+    if (!validLineType(l.lineType) || l.lineType === "BYLAYER") return false;
     ls.add(l.id);
   }
   const pt = (p) =>
@@ -468,10 +534,60 @@ export function validDocument(d) {
         "hatch",
         "dimension",
         "viewport",
+        "block",
       ].includes(e.type)
     )
       return false;
+    if (!validLineType(e.lineType)) return false;
     ids.add(e.id);
+    if (e.type === "block") {
+      const def = e.definition;
+      if (
+        !pt(e.point) ||
+        !Number.isFinite(e.rotation || 0) ||
+        !Number.isFinite(e.scale) ||
+        e.scale <= 0 ||
+        !def ||
+        typeof def.id !== "string" ||
+        !validBlockName(def.name) ||
+        !Array.isArray(def.entities) ||
+        !def.entities.length ||
+        def.entities.length > 10000 ||
+        def.entities.some(
+          (part) => !part || ["block", "viewport"].includes(part.type),
+        ) ||
+        !validDocument({
+          version: 1,
+          layers: d.layers,
+          entities: def.entities,
+        }) ||
+        !e.values ||
+        typeof e.values !== "object" ||
+        Array.isArray(e.values) ||
+        Object.values(e.values).some(
+          (v) => typeof v !== "string" || /[\r\n]/.test(v),
+        )
+      )
+        return false;
+      const tags = def.entities
+        .filter((part) => part.attributeTag)
+        .map((part) => part.attributeTag);
+      if (new Set(tags).size !== tags.length) return false;
+    }
+    if (!validAttributeSchema(e.attributeSchema)) return false;
+    if (
+      e.attributeTag != null &&
+      (e.type !== "text" || !validTag(e.attributeTag) || /[\r\n]/.test(e.text))
+    )
+      return false;
+    if (
+      e.type === "polyline" &&
+      e.bulges != null &&
+      (!Array.isArray(e.bulges) ||
+        e.bulges.length > e.points?.length ||
+        e.bulges.some((b) => !Number.isFinite(b) || Math.abs(b) > 1e6))
+    )
+      return false;
     if (e.type === "dimension" && !validDimension(e, pt)) return false;
     if (
       e.space &&
@@ -501,6 +617,16 @@ export function validDocument(d) {
     )
       return false;
     if (e.type === "line" && e.points.length !== 2) return false;
+    if (
+      hasBulges(e) &&
+      e.points.some(
+        (p, i) =>
+          (e.closed || i < e.points.length - 1) &&
+          Math.abs(e.bulges?.[i] || 0) > 1e-12 &&
+          dist(p, e.points[(i + 1) % e.points.length]) < 1e-8,
+      )
+    )
+      return false;
     if (
       ["circle", "arc"].includes(e.type) &&
       (!pt(e.center) || !Number.isFinite(e.radius) || e.radius <= 0)
@@ -704,17 +830,61 @@ export function demoDocument() {
   return { version: 1, name: "Ateljé — studieplan", layers, entities };
 }
 export function toDXF(doc) {
-  doc = {
-    ...doc,
-    entities: doc.entities.flatMap((e) =>
-      e.type === "dimension" ? dimensionParts(e) : [e],
-    ),
-  };
+  const customBlocks = [],
+    definitions = new Map(),
+    usedBlockNames = new Set(),
+    styles = [];
+  const prepare = (entities) =>
+    entities.flatMap((e) => {
+      if (e.type === "dimension")
+        return splitDimension(e).map((dim) => {
+          const blockName = `*D${customBlocks.length + 1}`;
+          customBlocks.push({
+            blockName,
+            flags: 1,
+            entities: dimensionParts(dim),
+          });
+          let style = styles.find(
+            (s) =>
+              s.height === dim.height && s.precision === (dim.precision || 0),
+          );
+          if (!style) {
+            style = {
+              name: `LIRA_DIM_${styles.length + 1}`,
+              height: dim.height,
+              precision: dim.precision || 0,
+            };
+            styles.push(style);
+          }
+          return { ...dim, _dimBlock: blockName, _dimStyle: style.name };
+        });
+      if (e.type === "block") {
+        const key = JSON.stringify(e.definition);
+        if (!definitions.has(key)) {
+          let blockName = e.definition.name;
+          if (usedBlockNames.has(blockName.toLowerCase()))
+            blockName += "_" + (definitions.size + 1);
+          usedBlockNames.add(blockName.toLowerCase());
+          definitions.set(key, blockName);
+          customBlocks.push({
+            blockName,
+            flags: e.definition.entities.some((p) => p.attributeTag) ? 2 : 0,
+            entities: prepare(e.definition.entities),
+          });
+        }
+        return [{ ...e, _blockName: definitions.get(key) }];
+      }
+      return [e];
+    });
+  doc = { ...doc, entities: prepare(doc.entities) };
+  prepare(
+    (doc.blocks || []).map((definition) => ({ type: "block", definition })),
+  );
   let out = [],
     sink = out;
   const extraBlocks = new Map();
   const pair = (c, v) => sink.push(String(c), String(v));
-  const layouts = dxfLayouts(doc, pair);
+  const layouts = dxfLayouts(doc, pair, customBlocks);
   const point = (p, x = 10, y = 20) => {
     pair(x, p.x);
     pair(y, p.y);
@@ -729,6 +899,38 @@ export function toDXF(doc) {
   pair(0, "ENDSEC");
   pair(0, "SECTION");
   pair(2, "TABLES");
+  const lineTable = layouts.handle();
+  pair(0, "TABLE");
+  pair(2, "LTYPE");
+  pair(5, lineTable);
+  pair(330, "0");
+  pair(100, "AcDbSymbolTable");
+  pair(70, lineTypes.length + 2);
+  for (const [id, label, pattern] of [
+    ["BYLAYER", "ByLayer", []],
+    ["BYBLOCK", "ByBlock", []],
+    ...lineTypes,
+  ]) {
+    pair(0, "LTYPE");
+    pair(5, layouts.handle());
+    pair(330, lineTable);
+    pair(100, "AcDbSymbolTableRecord");
+    pair(100, "AcDbLinetypeTableRecord");
+    pair(2, id);
+    pair(70, 0);
+    pair(3, label);
+    pair(72, 65);
+    pair(73, pattern.length);
+    pair(
+      40,
+      pattern.reduce((sum, v) => sum + Math.abs(v), 0),
+    );
+    for (const value of pattern) {
+      pair(49, value);
+      pair(74, 0);
+    }
+  }
+  pair(0, "ENDTAB");
   pair(0, "TABLE");
   pair(2, "LAYER");
   pair(5, "10");
@@ -745,9 +947,10 @@ export function toDXF(doc) {
     pair(70, l.locked ? 4 : 0);
     pair(62, l.visible === false ? -7 : 7);
     pair(420, parseInt(l.color.slice(1), 16));
-    pair(6, "CONTINUOUS");
+    pair(6, l.lineType || "CONTINUOUS");
   }
   pair(0, "ENDTAB");
+  if (styles.length) dimensionStyles(styles, pair, layouts.handle);
   layouts.tables();
   pair(0, "ENDSEC");
   const blocksInsert = out.length;
@@ -755,7 +958,8 @@ export function toDXF(doc) {
   pair(2, "ENTITIES");
   const start = (type, e, subclass) => {
     pair(0, type);
-    pair(5, layouts.handle());
+    const handle = layouts.handle();
+    pair(5, handle);
     pair(330, layouts.owner(e));
     pair(100, "AcDbEntity");
     pair(8, str(doc.layers.find((l) => l.id === e.layer)?.name || "0"));
@@ -766,8 +970,10 @@ export function toDXF(doc) {
         str(doc.layouts?.find((l) => l.id === e.space)?.name || "Layout1"),
       );
     }
+    if (e.lineType) pair(6, e.lineType);
     if (e.color) pair(420, parseInt(e.color.slice(1), 16));
-    pair(100, subclass);
+    if (subclass) pair(100, subclass);
+    return handle;
   };
   const writeText = (e) => {
     if (needsMtext(e)) {
@@ -799,11 +1005,46 @@ export function toDXF(doc) {
     }
   };
   let viewportId = 2;
-  for (const e of doc.entities) {
-    const extra =
-      e.space && (doc.layouts || []).findIndex((l) => l.id === e.space) > 0;
-    if (extra && !extraBlocks.has(e.space)) extraBlocks.set(e.space, []);
-    sink = extra ? extraBlocks.get(e.space) : out;
+  const writeAttribute = (e, type) => {
+    start(type, e, "AcDbText");
+    point(e.point);
+    pair(30, 0);
+    pair(40, e.height);
+    pair(1, str(e.text));
+    pair(50, ((e.rotation || 0) * 180) / Math.PI);
+    pair(100, type === "ATTDEF" ? "AcDbAttributeDefinition" : "AcDbAttribute");
+    if (type === "ATTDEF") pair(3, e.attributeTag);
+    pair(2, e.attributeTag);
+    pair(70, 0);
+    pair(73, 0);
+    pair(74, 0);
+    pair(280, 0);
+  };
+  const writeEntity = (e) => {
+    if (e.type === "dimension") {
+      writeDimension(e, start, pair, point);
+      return;
+    }
+    if (e.type === "block") {
+      const attributes = blockParts(e).filter((p) => p.attributeTag);
+      const owner = start("INSERT", e, "AcDbBlockReference");
+      if (attributes.length) pair(66, 1);
+      pair(2, e._blockName);
+      point(e.point);
+      pair(30, 0);
+      pair(41, e.scale);
+      pair(42, e.mirrored ? -e.scale : e.scale);
+      pair(43, e.scale);
+      pair(50, ((e.rotation || 0) * 180) / Math.PI);
+      for (const part of attributes)
+        writeAttribute({ ...part, _owner: owner }, "ATTRIB");
+      if (attributes.length) start("SEQEND", { ...e, _owner: owner }, null);
+      return;
+    }
+    if (e.type === "text" && e.attributeTag) {
+      writeAttribute(e, "ATTDEF");
+      return;
+    }
     if (e.type === "viewport") {
       start("VIEWPORT", e, "AcDbViewport");
       const [a, b] = e.points,
@@ -851,7 +1092,10 @@ export function toDXF(doc) {
       start("LWPOLYLINE", e, "AcDbPolyline");
       pair(90, e.points.length);
       pair(70, e.closed ? 1 : 0);
-      for (const p of e.points) point(p);
+      e.points.forEach((p, i) => {
+        point(p);
+        if (e.bulges?.[i]) pair(42, e.bulges[i]);
+      });
     }
     if (e.type === "text") writeText(e);
     if (e.type === "leader") {
@@ -910,12 +1154,24 @@ export function toDXF(doc) {
       pair(79, 0);
       pair(98, 0);
     }
+  };
+  for (const e of doc.entities) {
+    const extra =
+      e.space && (doc.layouts || []).findIndex((l) => l.id === e.space) > 0;
+    if (extra && !extraBlocks.has(e.space)) extraBlocks.set(e.space, []);
+    sink = extra ? extraBlocks.get(e.space) : out;
+    writeEntity(e);
   }
   sink = out;
   pair(0, "ENDSEC");
   const blockData = [];
   sink = blockData;
   layouts.blocks((l) => {
+    if (l.entities) {
+      for (const e of l.entities)
+        writeEntity({ ...e, space: undefined, _owner: l.record });
+      return;
+    }
     const data = extraBlocks.get(l.id);
     if (data) sink.push(...data);
   });

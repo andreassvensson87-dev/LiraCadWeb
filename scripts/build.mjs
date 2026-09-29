@@ -4,6 +4,7 @@ import {
   mkdir,
   readdir,
   copyFile,
+  cp,
 } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -15,6 +16,22 @@ const sourceFiles = (await readdir(path.join(root, "src"))).filter((f) =>
 );
 for (const file of sourceFiles)
   await copyFile(path.join(root, "src", file), path.join(out, file));
+await cp(path.join(root, "src/vendor"), path.join(out, "vendor"), {
+  recursive: true,
+});
+async function vendorFiles(dir, prefix = "vendor") {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const name = prefix + "/" + entry.name;
+    if (entry.isDirectory())
+      files.push(...(await vendorFiles(path.join(dir, entry.name), name)));
+    else files.push(name);
+  }
+  return files;
+}
+const dwgFiles = await vendorFiles(path.join(root, "src/vendor"));
+sourceFiles.push(...dwgFiles);
 const shared = ["manifest.webmanifest", "icon-192.png", "icon-512.png"];
 for (const file of shared)
   await copyFile(path.join(root, file), path.join(out, file));

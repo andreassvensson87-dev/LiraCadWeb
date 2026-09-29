@@ -1,3 +1,21 @@
+import { lineTypes, linePattern } from "./linetypes.js";
+import {
+  attributeSchema,
+  attributeOptions,
+  sortedAttributes,
+  validAttributeSchema,
+  validAttributeDate,
+} from "./attributes.js";
+import {
+  updateBlockDefinition,
+  blockParts,
+  blockTemplates,
+  createBlock,
+  insertBlock,
+  validBlockName,
+  validTag,
+} from "./blocks.js";
+import { polylineParts, hasBulges } from "./polyline.js";
 import { setupPWA } from "./pwa.js";
 import { trimExtend } from "./trim-extend.js";
 import { layoutSVG } from "./plot.js";
@@ -20,7 +38,7 @@ import {
   viewportContains,
   paperSnaps,
 } from "./layout.js";
-import { grips, gripEntity } from "./grips.js";
+import { grips, gripTargets, moveGripTargets } from "./grips.js";
 import { textLines, textFont } from "./text.js";
 import { TrackingReferences } from "./tracking.js";
 import { createSnapIndex, nearbySnaps, resolveSnap } from "./snapping.js";
@@ -66,6 +84,12 @@ const canvas = $("#canvas"),
   ctx = canvas.getContext("2d"),
   input = $("#command-input");
 const icons = {
+  BEDIT:
+    '<rect x="3" y="3" width="18" height="18"/><path d="m8 16 2-5 6-6 3 3-6 6z"/>',
+  BLOCK: '<rect x="3" y="3" width="18" height="18"/><path d="M8 8h8v8H8z"/>',
+  INSERT:
+    '<rect x="3" y="3" width="12" height="12"/><path d="M18 12v10m-5-5h10"/>',
+  ATTDEF: '<path d="M3 19 9 5l6 14M5 14h8m4-8h6m-3 0v13"/>',
   TRIM: '<path d="M3 3v18M1 8h20M9 4l8 8m0-8-8 8"/>',
   EXTEND: '<path d="M21 3v18M3 12h18m-5-5 5 5-5 5"/>',
   LINE: '<path d="M4 20 20 4"/><path d="M2 18h4v4H2zM18 2h4v4h-4z"/>',
@@ -133,6 +157,10 @@ const definitions = [
   ["TRIM", "Trimma", "TR"],
   ["EXTEND", "Förläng", "EX"],
   ["MVIEW", "Skapa viewport", "MV"],
+  ["BLOCK", "Skapa block", "B"],
+  ["INSERT", "Infoga block", "I"],
+  ["ATTDEF", "Attribut", "ATT"],
+  ["BEDIT", "Blockeditor", "BE"],
 ];
 const aliases = Object.fromEntries(
   definitions.flatMap(([name, , a]) => [
@@ -174,6 +202,7 @@ for (const [i, [name, label, a]] of definitions
   ).append(b);
 }
 let inlineEdit = null;
+let blockEditor = null;
 let doc = demoDocument(),
   restoreError = false;
 try {
@@ -300,6 +329,7 @@ function enterViewport(e) {
   schedule();
 }
 function switchSpace(id) {
+  if (blockEditor) return;
   if (inlineEdit) finishTextEdit(true);
   if (activeViewportId) leaveViewport();
   spaceCameras.set(activeSpace, { ...camera });
@@ -311,6 +341,7 @@ function switchSpace(id) {
   update();
 }
 function createLayout() {
+  if (blockEditor) return;
   const id = uid();
   let number = (doc.layouts?.length || 0) + 1;
   while (doc.layouts?.some((l) => l.name.toLowerCase() === `layout ${number}`))
@@ -327,6 +358,10 @@ function createLayout() {
 }
 function renderSpaceControls() {
   const tabs = $("#space-tabs");
+  tabs.hidden = !!blockEditor;
+  $("#new-layout").disabled = !!blockEditor;
+  for (const id of ["new-file", "open-file", "demo-file", "export-dxf"])
+    $("#" + id).disabled = !!blockEditor;
   const spaces = [
     ["model", "Model"],
     ...(doc.layouts || []).map((l) => [l.id, l.name]),
@@ -353,11 +388,13 @@ function renderSpaceControls() {
   $("#viewport-create").disabled =
     activeSpace === "model" || !!activeViewportId;
   $("#paper-space").disabled = !activeViewportId;
-  $("#space-context").textContent = activeViewportId
-    ? "MODEL via viewport"
-    : activeSpace === "model"
-      ? "MODEL"
-      : "PAPPER · mm";
+  $("#space-context").textContent = blockEditor
+    ? "BLOCK · " + doc.name
+    : activeViewportId
+      ? "MODEL via viewport"
+      : activeSpace === "model"
+        ? "MODEL"
+        : "PAPPER · mm";
   $("#export-sheet").disabled = activeSpace === "model";
 }
 function paperPoint(pixel) {
@@ -459,8 +496,12 @@ function paintLayout() {
       drag.entity.id === original.id &&
       drag.moved
         ? movedViewport()
-        : drag?.kind === "grip" && drag.entity.id === original.id
-          ? gripEntity(drag.entity, drag.grip, cursor)
+        : drag?.kind === "grip" &&
+            drag.targets.some((t) => t.entity.id === original.id)
+          ? moveGripTargets(
+              drag.targets.filter((t) => t.entity.id === original.id),
+              cursor,
+            )[0]
           : original;
     camera = base;
     const a = screen(v.points[0]),
@@ -499,6 +540,10 @@ function rebuild() {
   snapCache = createSnapIndex(doc.entities.filter(visible));
 }
 function persisted() {
+  if (blockEditor) {
+    $("#save-state").textContent = "Blockändringar ej sparade";
+    return;
+  }
   clearTimeout(savingTimer);
   $("#save-state").textContent = "Sparar…";
   savingTimer = setTimeout(() => {
@@ -577,7 +622,8 @@ function setCreationMode(mode) {
   creationMode = mode;
   Object.assign(creationDefaults, clone(creationPresets[mode]));
 }
-let creationColor = null;
+let creationColor = null,
+  creationLineType = "BYLAYER";
 function make(type, props) {
   return {
     id: uid(),
@@ -586,6 +632,7 @@ function make(type, props) {
     space: drawingSpace(),
     ...props,
     color: creationColor,
+    lineType: creationLineType,
     ...creationDefaults[type],
   };
 }
@@ -611,11 +658,13 @@ let cornerSize = 0,
 function selectedEntities() {
   return doc.entities.filter((e) => selection.has(e.id) && editable(e));
 }
-function replaceEntities(originals, replacements, label) {
+function replaceEntities(originals, replacements, label, definitions = []) {
   const ids = new Set(originals.map((e) => e.id));
   commit(label, () => {
     doc.entities = doc.entities.filter((e) => !ids.has(e.id));
     doc.entities.push(...replacements);
+    if (definitions.length)
+      doc.blocks = [...(doc.blocks || []), ...clone(definitions)];
   });
   selection = new Set(replacements.map((e) => e.id));
   tool = null;
@@ -642,13 +691,20 @@ function prepareAdvancedSelection() {
       return;
     }
     if (tool.name === "EXPLODE") {
-      if (!es.length) throw Error("Välj polylinjer eller mått.");
+      if (!es.length) throw Error("Välj polylinjer, block eller mått.");
       replaceEntities(
         es,
         es.flatMap((e) =>
           e.type === "dimension"
             ? dimensionParts(e).map((p) => ({ ...p, id: uid() }))
-            : explodePolyline(e),
+            : e.type === "block"
+              ? blockParts(e).map((p) => {
+                  const n = { ...p, id: uid() };
+                  delete n.attributeTag;
+                  delete n.attributeSchema;
+                  return n;
+                })
+              : explodePolyline(e),
         ),
         "Dela upp",
       );
@@ -1258,6 +1314,25 @@ function path(points, close = false) {
   if (close) ctx.closePath();
 }
 function drawEntity(e, color, selected = false, preview = false) {
+  if (e.type === "block") {
+    for (const part of blockParts(e)) {
+      if (layerOf(part)?.visible !== false)
+        drawEntity(
+          part,
+          selected || preview
+            ? color
+            : part.color || layerOf(part)?.color || color,
+          selected,
+          preview,
+        );
+    }
+    return;
+  }
+  if (hasBulges(e)) {
+    for (const part of polylineParts(e))
+      drawEntity(part, color, selected, preview);
+    return;
+  }
   if (e.type === "dimension") {
     for (const part of dimensionParts(e))
       drawEntity(part, color, selected, preview);
@@ -1275,7 +1350,11 @@ function drawEntity(e, color, selected = false, preview = false) {
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.lineWidth = selected ? 1.8 : 1.15;
-  ctx.setLineDash(preview ? [6, 4] : []);
+  ctx.setLineDash(
+    preview
+      ? [6, 4]
+      : linePattern(e, layerOf(e)).map((v) => Math.abs(v) * camera.scale),
+  );
   if (e.type === "circle" || e.type === "arc") {
     const c = screen(e.center);
     ctx.beginPath();
@@ -1426,12 +1505,8 @@ function render() {
   }
   for (const e of previewEntities()) drawEntity(e, "#8ae4b6", false, true);
   if (drag?.kind === "grip") {
-    drawEntity(
-      gripEntity(drag.entity, drag.grip, cursor),
-      "#a0f3c7",
-      true,
-      true,
-    );
+    for (const e of moveGripTargets(drag.targets, cursor))
+      drawEntity(e, "#a0f3c7", true, true);
   }
   if (drag?.kind === "select" && drag.moved) {
     const a = drag.start,
@@ -1536,7 +1611,22 @@ function previewEntities() {
     layer = activeLayer;
   if (n === "LINE" && p.length)
     return [{ type: "line", points: [p.at(-1), q], layer }];
-  if (["PLINE", "HATCH"].includes(n) && p.length)
+  if (n === "INSERT" && tool.template && tool.phase === "points")
+    return [insertBlock(tool.template, q, layer, drawingSpace())];
+  if (n === "PLINE" && p.length) {
+    const base = {
+      type: "polyline",
+      points: p,
+      bulges: tool.bulges || [],
+      layer,
+    };
+    if (tool.arcMode && tool.arcMid) {
+      const arc = arcThrough(p.at(-1), tool.arcMid, q);
+      return [base, ...(arc ? [{ type: "arc", ...arc, layer }] : [])];
+    }
+    return [base, { type: "line", points: [p.at(-1), q], layer }];
+  }
+  if (["HATCH"].includes(n) && p.length)
     return [
       {
         type: "polyline",
@@ -1589,6 +1679,17 @@ function prompt() {
     const n = tool.name,
       p = tool.points.length;
     if (tool.phase === "select") s = "Välj objekt · Enter fortsätter";
+    else if (tool.phase === "blockName") s = "Ange ett unikt blocknamn";
+    else if (tool.phase === "insertName") s = "Ange blocknamn";
+    else if (tool.phase === "attributeName") s = "Attributnamn (t.ex. NUMMER)";
+    else if (n === "BLOCK") s = "Ange blockets baspunkt";
+    else if (n === "INSERT") s = "Ange insättningspunkt";
+    else if (n === "PLINE" && p)
+      s = tool.arcMode
+        ? tool.arcMid
+          ? "Ange bågens slutpunkt · L = linje"
+          : "Ange punkt på bågen · L = linje · Enter avslutar"
+        : "Nästa punkt · A = båge · C = slut · U = ångra · Enter avslutar";
     else if (tool.phase === "text") s = "Skriv text och tryck Enter";
     else if (n === "LINE" || n === "PLINE")
       s = p
@@ -1669,6 +1770,22 @@ function start(name) {
   if (inlineEdit) finishTextEdit(true);
   name = aliases[name.toUpperCase()] || name.toUpperCase();
   if (["MT", "MTEXT"].includes(name)) name = "TEXT";
+  if (["BEDIT", "BE"].includes(name)) {
+    beginBlockEdit(selectedEntities()[0]);
+    return;
+  }
+  if (name === "BCLOSE" || name === "BSAVE") {
+    finishBlockEdit(true);
+    return;
+  }
+  if (name === "BCANCEL") {
+    finishBlockEdit(false);
+    return;
+  }
+  if (blockEditor && ["BLOCK", "INSERT", "MVIEW", "DXF"].includes(name)) {
+    log("Avsluta blockeditorn först.");
+    return;
+  }
   if (name === "MODEL") {
     switchSpace("model");
     return;
@@ -1706,6 +1823,50 @@ function start(name) {
     !["DIST", "PAN"].includes(name)
   ) {
     log(`Okänt kommando: ${name}`);
+    return;
+  }
+  if (["BLOCK", "INSERT", "ATTDEF"].includes(name)) {
+    if (
+      name !== "ATTDEF" &&
+      (doc.layers.find((l) => l.id === activeLayer)?.locked ||
+        doc.layers.find((l) => l.id === activeLayer)?.visible === false)
+    ) {
+      log("Välj ett synligt, olåst lager först.");
+      return;
+    }
+    clearTracking();
+    if (
+      name === "ATTDEF" &&
+      (selectedEntities().length !== 1 || selectedEntities()[0].type !== "text")
+    ) {
+      log("Markera en text och kör ATTDEF för att ge den ett attributnamn.");
+      return;
+    }
+    if (name === "INSERT" && !blockTemplates(doc).length) {
+      log("Skapa först ett block med BLOCK.");
+      return;
+    }
+    tool = {
+      name,
+      points: [],
+      phase:
+        name === "BLOCK"
+          ? selectedEntities().length
+            ? "blockName"
+            : "select"
+          : name === "INSERT"
+            ? "insertName"
+            : "attributeName",
+    };
+    lastCommand = name;
+    if (name === "INSERT")
+      log(
+        "Block: " +
+          [...new Set(blockTemplates(doc).map((e) => e.definition.name))].join(
+            ", ",
+          ),
+      );
+    prompt();
     return;
   }
   if (startAdvanced(name)) return;
@@ -1748,6 +1909,12 @@ function start(name) {
 }
 function offsetSelection() {
   const es = doc.entities.filter((e) => selection.has(e.id));
+  if (es.some(hasBulges)) {
+    log(
+      "OFFSET av polylinjer med bågar stöds inte ännu. Dela upp med X först.",
+    );
+    return false;
+  }
   if (
     !es.length ||
     !es.every((e) => ["line", "circle", "arc", "polyline"].includes(e.type))
@@ -1823,6 +1990,28 @@ function acceptPoint(p) {
     (tool.phase === "distance" && n !== "OFFSET")
   )
     return;
+  if (["blockName", "insertName", "attributeName"].includes(tool.phase)) return;
+  if (n === "BLOCK") {
+    try {
+      const es = selectedEntities();
+      const b = createBlock(es, tool.blockName, p, activeLayer, drawingSpace());
+      replaceEntities(es, [b], "Skapa block", [b.definition]);
+    } catch (e) {
+      log(e.message);
+    }
+    return;
+  }
+  if (n === "INSERT") {
+    const b = insertBlock(tool.template, p, activeLayer, drawingSpace());
+    b.color = creationColor;
+    b.lineType = creationLineType;
+    addEntities([b], "Infoga block");
+    selection = new Set([b.id]);
+    tool = null;
+    prompt();
+    update();
+    return;
+  }
   if (advancedPoint(p)) return;
   if (transforms.includes(n)) {
     if (!ps.length) ps.push(p);
@@ -1844,7 +2033,23 @@ function acceptPoint(p) {
     }
     ps.push(p);
   } else if (n === "PLINE" || n === "HATCH") {
-    if (!ps.length || dist(ps.at(-1), p) > 1e-8) ps.push(p);
+    if (n === "PLINE" && ps.length && tool.arcMode) {
+      if (!tool.arcMid) {
+        if (dist(ps.at(-1), p) > 1e-8) tool.arcMid = p;
+      } else {
+        const a = arcThrough(ps.at(-1), tool.arcMid, p);
+        if (!a) {
+          log("Bågens tre punkter får inte ligga på en rät linje.");
+          return;
+        }
+        (tool.bulges ||= []).push(Math.tan(a.sweep / 4));
+        ps.push(p);
+        tool.arcMid = null;
+      }
+    } else if (!ps.length || dist(ps.at(-1), p) > 1e-8) {
+      if (n === "PLINE" && ps.length) (tool.bulges ||= []).push(0);
+      ps.push(p);
+    }
   } else if (n === "RECTANG") {
     if (!ps.length) ps.push(p);
     else if (Math.abs(p.x - ps[0].x) > 1e-8 && Math.abs(p.y - ps[0].y) > 1e-8) {
@@ -1943,6 +2148,99 @@ function submit(value) {
     else start(lastCommand);
     return;
   }
+  if (tool.name === "BLOCK" && tool.phase === "select") {
+    if (!selectedEntities().length) {
+      log("Välj objekt först.");
+      return;
+    }
+    tool.phase = "blockName";
+    prompt();
+    return;
+  }
+  if (tool.phase === "blockName") {
+    if (
+      !validBlockName(s) ||
+      blockTemplates(doc).some(
+        (e) => e.definition.name.toLowerCase() === s.toLowerCase(),
+      )
+    ) {
+      log("Ange ett unikt blocknamn med bokstäver, siffror, _ eller -.");
+      return;
+    }
+    tool.blockName = s;
+    tool.phase = "points";
+    prompt();
+    return;
+  }
+  if (tool.phase === "insertName") {
+    const template = blockTemplates(doc).find(
+      (e) => e.definition.name.toLowerCase() === s.toLowerCase(),
+    );
+    if (!template) {
+      log("Blocknamnet finns inte i ritningen.");
+      return;
+    }
+    tool.template = clone(template);
+    tool.phase = "points";
+    selection.clear();
+    prompt();
+    return;
+  }
+  if (tool.phase === "attributeName") {
+    if (/[\r\n]/.test(selectedEntities()[0]?.text || "")) {
+      log("Attribut stöder en textrad i denna version.");
+      return;
+    }
+    const tag = s.toUpperCase();
+    if (!validTag(tag)) {
+      log("Använd A–Z, 0–9 och _, börja med bokstav.");
+      return;
+    }
+    editSelected("Attributdefinition", (e) => ({ ...e, attributeTag: tag }));
+    tool = null;
+    prompt();
+    return;
+  }
+  if (tool.name === "PLINE") {
+    if (["A", "L"].includes(s.toUpperCase())) {
+      tool.arcMode = s.toUpperCase() === "A";
+      tool.arcMid = null;
+      prompt();
+      return;
+    }
+    if (s.toUpperCase() === "U") {
+      if (tool.arcMid) tool.arcMid = null;
+      else {
+        tool.points.pop();
+        tool.bulges?.pop();
+      }
+      prompt();
+      return;
+    }
+    if (s.toUpperCase() === "C") {
+      if (tool.points.length < 3) {
+        log("Ange minst tre hörn före slutning.");
+        return;
+      }
+      addEntities(
+        [
+          make("polyline", {
+            points: tool.points,
+            bulges: tool.bulges || [],
+            closed: true,
+          }),
+        ],
+        "Polylinje",
+      );
+      tool = null;
+      prompt();
+      return;
+    }
+    if (!s && tool.arcMid) {
+      log("Ange bågens slutpunkt eller U för att ångra mellanpunkten.");
+      return;
+    }
+  }
   if (advancedSubmit(s)) return;
   if (tool.phase === "text") {
     if (!s) {
@@ -1997,6 +2295,7 @@ function submit(value) {
         [
           make(tool.name === "HATCH" ? "hatch" : "polyline", {
             points: tool.points,
+            bulges: tool.name === "PLINE" ? tool.bulges || [] : undefined,
             closed: tool.name === "HATCH",
             spacing: 120,
           }),
@@ -2150,7 +2449,12 @@ function resolveCursor() {
     }
     if (drag?.kind === "grip")
       candidates = candidates.filter(
-        (s) => !(s.id === drag.entity.id && dist(s.p, drag.grip.p) < 1e-7),
+        (s) =>
+          !drag.targets.some(
+            (t) =>
+              s.id === t.entity.id &&
+              t.grips.some((g) => dist(s.p, g.p) < 1e-7),
+          ),
       );
     const directional = !["ARC", "SCALE"].includes(tool?.name);
     const result = resolveSnap({
@@ -2241,6 +2545,10 @@ function finishTextEdit(save) {
       ...current.entity,
       text: $("#inline-text").value.replace(/\r\n?/g, "\n"),
     };
+  if (save && e.attributeTag && /[\r\n]/.test(e.text)) {
+    log("Attributet behöver en enda textrad.");
+    return;
+  }
   inlineEdit = null;
   $("#text-editor").hidden = true;
   if (save) {
@@ -2303,6 +2611,10 @@ canvas.addEventListener("dblclick", (ev) => {
   if (tool || inlineEdit) return;
   moveCursor(ev);
   const e = hit(rawCursor);
+  if (e?.type === "block") {
+    beginBlockEdit(e);
+    return;
+  }
   if (e && ["text", "leader"].includes(e.type)) {
     beginTextEdit(e);
     return;
@@ -2375,7 +2687,10 @@ canvas.addEventListener("pointerdown", (ev) => {
     if (closest) {
       drag = {
         kind: "grip",
-        entity: clone(closest.e),
+        targets: gripTargets(
+          doc.entities.filter((e) => selection.has(e.id) && editable(e)),
+          closest.g.p,
+        ),
         grip: closest.g,
         start: { ...mouse },
       };
@@ -2468,20 +2783,15 @@ canvas.addEventListener("pointerup", (ev) => {
       }
     }
   } else if (drag.kind === "grip" && dist(mouse, drag.start) > 4) {
-    const e = gripEntity(drag.entity, drag.grip, cursor);
+    const changed = moveGripTargets(drag.targets, cursor);
+    const replacements = new Map(changed.map((e) => [e.id, e]));
+    const entities = doc.entities.map((e) => replacements.get(e.id) || e);
     if (
-      !validDocument({
-        ...doc,
-        entities: doc.entities.map((x) => (x.id === e.id ? e : x)),
-      }) ||
-      (e.type === "line" && dist(...e.points) < 1e-8)
+      !validDocument({ ...doc, entities }) ||
+      changed.some((e) => e.type === "line" && dist(...e.points) < 1e-8)
     )
-      log("Greppet skulle ge ogiltig geometri.");
-    else
-      commit(
-        "Ändra grepp",
-        () => (doc.entities = doc.entities.map((x) => (x.id === e.id ? e : x))),
-      );
+      log("Greppen skulle ge ogiltig geometri.");
+    else commit("Ändra grepp", () => (doc.entities = entities));
   }
   syncViewport();
   drag = null;
@@ -2750,7 +3060,7 @@ function section(title) {
   const h = document.createElement("div");
   h.className = "section-title";
   h.textContent = title;
-  el.append(h);
+  if (title) el.append(h);
   return el;
 }
 function layerSelect(onChange, value) {
@@ -2971,82 +3281,293 @@ function appearanceFields(root, e, change) {
   }
 }
 function creationInspector(root) {
-  if (tool.name === "DIMCONTINUE") {
-    const heading = section("SKAPA / Kedjemått");
-    if (tool.source && tool.phase === "chainPoints") {
-      const source = tool.source;
-      heading.append(
-        layerSelect((value) => {
-          const layer = doc.layers.find((l) => l.id === value);
-          if (layer.locked || layer.visible === false) {
-            log("Välj ett synligt, olåst lager.");
-            renderInspector();
-            return;
-          }
-          source.layer = value;
-          schedule();
-        }, source.layer),
-      );
-      appearanceFields(heading, { ...source, text: "" }, (key, value) => {
-        source[key] = value;
-        schedule();
-      });
-      colorFields(
-        heading,
-        source.color,
-        doc.layers.find((l) => l.id === source.layer)?.color,
-        (value) => {
-          source.color = value;
-          renderInspector();
-          schedule();
-        },
-      );
-    }
-    root.append(heading);
+  const source = tool.name === "DIMCONTINUE" ? tool.source : null;
+  if (source) {
+    appearanceFields(root, source, (key, value) => {
+      source[key] = value;
+      schedule();
+    });
     return;
   }
-  const heading = section(
-    "SKAPA / " +
-      (definitions.find((d) => d[0] === tool.name)?.[1] || tool.name),
-  );
-  heading.append(
-    layerSelect((v) => {
-      const layer = doc.layers.find((l) => l.id === v);
-      if (layer.locked || layer.visible === false) {
-        log("Välj ett synligt, olåst lager.");
-        renderInspector();
-        return;
-      }
-      activeLayer = v;
-      renderLayers();
-    }, activeLayer),
-  );
   const type = tool.name.startsWith("DIM")
     ? "dimension"
     : { TEXT: "text", LEADER: "leader", HATCH: "hatch" }[tool.name];
   if (type)
     appearanceFields(
-      heading,
+      root,
       { type, ...creationDefaults[type] },
       (key, value) => {
         creationDefaults[type][key] = value;
         schedule();
       },
     );
-  colorFields(
-    heading,
-    creationColor,
-    doc.layers.find((l) => l.id === activeLayer)?.color,
-    (value) => {
-      creationColor = value;
+}
+function generalProperties(root) {
+  const es = selectedEntities();
+  const creating =
+    tool &&
+    !transforms.includes(tool.name) &&
+    ![
+      "ERASE",
+      "OFFSET",
+      "JOIN",
+      "EXPLODE",
+      "PINSERT",
+      "PDELETE",
+      "FILLET",
+      "CHAMFER",
+      "TRIM",
+      "EXTEND",
+    ].includes(tool.name);
+  const source = tool?.name === "DIMCONTINUE" ? tool.source : null;
+  const targets = source ? [source] : creating ? [] : es;
+  const shared = (key, fallback) =>
+    targets.length
+      ? targets.every(
+          (e) => (e[key] ?? fallback) === (targets[0][key] ?? fallback),
+        )
+        ? (targets[0][key] ?? fallback)
+        : "mixed"
+      : fallback;
+  const change = (key, value) => {
+    if (source) {
+      source[key] = value;
       renderInspector();
-    },
+      schedule();
+    } else if (targets.length)
+      editSelected("Egenskap", (e) => ({ ...e, [key]: value }));
+    else {
+      if (key === "layer") {
+        const layer = doc.layers.find((l) => l.id === value);
+        if (layer.locked || layer.visible === false) {
+          log("Välj ett synligt, olåst lager.");
+          renderInspector();
+          return;
+        }
+        activeLayer = value;
+      }
+      if (key === "color") creationColor = value;
+      if (key === "lineType") creationLineType = value;
+      renderInspector();
+      renderLayers();
+      schedule();
+    }
+  };
+  const layer = shared("layer", activeLayer);
+  const group = document.createElement("div");
+  group.className = "general-properties";
+  group.append(
+    layerSelect((v) => change("layer", v), layer === "mixed" ? "" : layer),
   );
-  root.append(heading);
+  colorFields(
+    group,
+    shared("color", targets.length ? null : creationColor),
+    doc.layers.find((l) => l.id === layer)?.color,
+    (v) => change("color", v),
+  );
+  const type = shared(
+    "lineType",
+    targets.length ? "BYLAYER" : creationLineType,
+  );
+  group.append(
+    choice(
+      "Linjetyp",
+      type,
+      [
+        ...(type === "mixed" ? [["mixed", "Blandat"]] : []),
+        ["BYLAYER", "Enligt lager"],
+        ...lineTypes.map(([id, label]) => [id, label]),
+      ],
+      (v) => {
+        if (v !== "mixed") change("lineType", v);
+      },
+    ),
+  );
+  root.append(group);
+}
+function attributeValueField(root, part, value, change) {
+  const spec = attributeSchema(part),
+    label = spec.label || part.attributeTag;
+  if (spec.type === "choice") {
+    const values = [...spec.options];
+    if (!values.includes(value)) values.unshift(value);
+    const options = values.map((v, i) => [String(i), v || "—"]);
+    if (spec.allowCustom) options.push(["custom", "Egen text…"]);
+    const control = choice(
+      label,
+      String(values.indexOf(value)),
+      options,
+      (key) => {
+        if (key === "custom") {
+          const custom = field(label + " – egen text", value, change, "text");
+          control.replaceWith(custom);
+          custom.querySelector("input").focus();
+        } else change(values[Number(key)]);
+      },
+    );
+    root.append(control);
+  } else if (spec.type === "date") {
+    // Preserve legacy text when changing an existing attribute to a date field.
+    if (!validAttributeDate(value))
+      root.append(field(label + " – befintligt värde", value, change, "text"));
+    root.append(
+      field(
+        label,
+        validAttributeDate(value) ? value : "",
+        (v) => {
+          if (validAttributeDate(v)) change(v);
+        },
+        "date",
+      ),
+    );
+  } else root.append(field(label, value, change, "text"));
+}
+function attributeDefinitionFields(root, entity) {
+  const spec = attributeSchema(entity);
+  const editAttribute = (label, patch) => {
+    const next = { ...spec, ...patch };
+    if (!validAttributeSchema(next)) {
+      log("Kontrollera attributets val: max 100 alternativ, ett per rad.");
+      renderInspector();
+      return;
+    }
+    editSelected(label, (n) => ({ ...n, attributeSchema: next }));
+  };
+  root.append(
+    field(
+      "Attributnamn",
+      entity.attributeTag,
+      (v) => {
+        const tag = v.trim().toUpperCase();
+        if (
+          !validTag(tag) ||
+          (blockEditor &&
+            doc.entities.some(
+              (e) => e.id !== entity.id && e.attributeTag === tag,
+            ))
+        ) {
+          log("Attributnamnet måste vara giltigt och unikt i blocket.");
+          renderInspector();
+          return;
+        }
+        editSelected("Attributnamn", (n) => ({ ...n, attributeTag: tag }));
+      },
+      "text",
+    ),
+  );
+  root.append(
+    field(
+      "Etikett",
+      spec.label,
+      (v) => editAttribute("Attributetikett", { label: v }),
+      "text",
+    ),
+  );
+  root.append(
+    choice(
+      "Fälttyp",
+      spec.type,
+      [
+        ["text", "Fritext"],
+        ["choice", "Dropdown"],
+        ["date", "Datum"],
+      ],
+      (v) => editAttribute("Attributtyp", { type: v }),
+    ),
+  );
+  if (spec.type === "choice") {
+    const options = field(
+      "Val – ett per rad",
+      spec.options.join("\n"),
+      (v) => editAttribute("Attributval", { options: attributeOptions(v) }),
+      "multiline",
+    );
+    options.classList.add("attribute-options");
+    root.append(options);
+    root.append(
+      choice(
+        "Egen text",
+        String(spec.allowCustom),
+        [
+          ["false", "Nej"],
+          ["true", "Tillåt"],
+        ],
+        (v) =>
+          editAttribute("Egna attributvärden", { allowCustom: v === "true" }),
+      ),
+    );
+  }
+  attributeValueField(
+    root,
+    { ...entity, attributeSchema: { ...spec, label: "Standardvärde" } },
+    entity.text,
+    (v) => editSelected("Attributstandard", (n) => ({ ...n, text: v })),
+  );
+  root.append(
+    field("Ordning", spec.order, (v) =>
+      editAttribute("Attributordning", { order: v }),
+    ),
+  );
+  root.append(
+    action("Gör till vanlig text", () =>
+      editSelected("Ta bort attribut", (n) => {
+        delete n.attributeTag;
+        delete n.attributeSchema;
+        return n;
+      }),
+    ),
+  );
+}
+function renderAttributeManager(root) {
+  const parts = sortedAttributes(doc.entities);
+  if (!parts.length) return;
+  const manager = document.createElement("details");
+  manager.className = "attribute-manager";
+  const summary = document.createElement("summary");
+  summary.textContent = `Attribut (${parts.length})`;
+  manager.append(summary);
+  for (const part of parts) {
+    const button = action(
+      attributeSchema(part).label || part.attributeTag,
+      () => {
+        cancel();
+        selection = new Set([part.id]);
+        update();
+      },
+    );
+    button.title = part.attributeTag;
+    manager.append(button);
+  }
+  root.append(manager);
 }
 function renderInspector() {
   const root = $("#properties-panel");
   root.replaceChildren();
+  generalProperties(root);
+  if (blockEditor) {
+    const panel = section("BLOCKEDITOR");
+    panel.append(
+      field(
+        "Blocknamn",
+        doc.name,
+        (v) => commit("Blocknamn", () => (doc.name = v.trim())),
+        "text",
+      ),
+    );
+    for (const axis of ["x", "y"])
+      panel.append(
+        field("Baspunkt " + axis.toUpperCase(), doc.blockBase[axis], (v) => {
+          if (Number.isFinite(v))
+            commit("Baspunkt", () => (doc.blockBase[axis] = v));
+        }),
+      );
+    panel.append(
+      action("Spara block", () => finishBlockEdit(true)),
+      action("Avbryt blockredigering", () => finishBlockEdit(false)),
+    );
+    root.append(panel);
+    renderAttributeManager(root);
+  }
   if (
     tool &&
     !transforms.includes(tool.name) &&
@@ -3066,22 +3587,6 @@ function renderInspector() {
   }
   const es = doc.entities.filter((e) => selection.has(e.id));
   if (!es.length) {
-    root.append(
-      layerSelect((v) => {
-        activeLayer = v;
-        renderLayers();
-        renderInspector();
-      }, activeLayer),
-    );
-    colorFields(
-      root,
-      creationColor,
-      doc.layers.find((l) => l.id === activeLayer)?.color,
-      (value) => {
-        creationColor = value;
-        renderInspector();
-      },
-    );
     if (activeSpace !== "model" && !activeViewportId) {
       const l = doc.layouts.find((l) => l.id === activeSpace),
         sec = section("PAPPER");
@@ -3141,29 +3646,31 @@ function renderInspector() {
     }
     return;
   }
-  const e = es[0],
-    def = definitions.find(
-      (d) => d[0] === (e.type === "polyline" ? "PLINE" : e.type.toUpperCase()),
-    ),
-    head = document.createElement("div");
-  head.className = "property-type";
-  head.innerHTML = `<div class="entity-symbol">${svg(def?.[0] || "LINE")}</div><div><strong>${es.length > 1 ? `${es.length} objekt` : def?.[1] || { dimension: e.chain ? "Måttkedja" : "Mått", viewport: "Viewport" }[e.type] || e.type}</strong><br><span>${es.length > 1 ? "Gemensamma egenskaper" : "Redigerbart objekt"}</span></div>`;
-  root.append(head);
-  root.append(
-    layerSelect(
-      (v) => {
-        if (v) editSelected("Ändra lager", (x) => ({ ...x, layer: v }));
-      },
-      es.every((x) => x.layer === e.layer) ? e.layer : "",
-    ),
-  );
-  const sameColor = es.every((x) => (x.color || null) === (e.color || null));
-  colorFields(root, sameColor ? e.color : "mixed", layerOf(e).color, (value) =>
-    editSelected("Färg", (n) => ({ ...n, color: value })),
-  );
+  if (es.length === 1 && es[0].type === "block") {
+    const block = es[0];
+    const attributes = section(block.definition.name);
+    for (const part of sortedAttributes(block.definition.entities))
+      attributeValueField(
+        attributes,
+        part,
+        block.values?.[part.attributeTag] ?? part.text,
+        (v) =>
+          editSelected("Blockattribut", (n) => ({
+            ...n,
+            values: { ...n.values, [part.attributeTag]: v },
+          })),
+      );
+    attributes.append(action("Redigera block", () => beginBlockEdit(block)));
+    root.append(attributes);
+    root.append(action("Radera markerade", erase));
+    return;
+  }
+  const e = es[0];
   if (es.length === 1) {
-    const geo = section("OBJEKTEGENSKAPER");
+    const geo = section("");
     const edit = (label, fn) => editSelected(label, fn);
+    if (e.type === "text" && e.attributeTag) attributeDefinitionFields(geo, e);
+
     if (e.type === "dimension" && !e.chain) {
       geo.append(
         field(
@@ -3211,13 +3718,7 @@ function renderInspector() {
     appearanceFields(geo, e, (key, value) =>
       edit("Egenskap", (n) => ({ ...n, [key]: value })),
     );
-    if (geo.children.length > 1) root.append(geo);
-  } else {
-    const p = document.createElement("p");
-    p.className = "muted";
-    p.textContent =
-      "Flytta, kopiera, rotera och skala hela markeringen med verktygen ovan.";
-    root.append(p);
+    if (geo.children.length) root.append(geo);
   }
   const b = document.createElement("button");
   b.className = "subtle-button";
@@ -3259,7 +3760,38 @@ function renderLayers() {
       cancel(false);
       commit("Lås lager", () => (l.locked = !l.locked));
     };
-    row.append(color, name, eye, lock);
+    const lineType = choice(
+      "Linjetyp",
+      l.lineType || "CONTINUOUS",
+      lineTypes.map(([id, label]) => [id, label]),
+      (v) => commit("Lagerlinjetyp", () => (l.lineType = v)),
+    );
+    const rename = field(
+      "Namn",
+      l.name,
+      (v) => {
+        if (
+          v.trim() &&
+          !doc.layers.some(
+            (other) =>
+              other.id !== l.id &&
+              other.name.toLowerCase() === v.trim().toLowerCase(),
+          )
+        )
+          commit("Lagernamn", () => (l.name = v.trim()));
+        else {
+          log("Lagernamnet måste vara unikt.");
+          renderLayers();
+        }
+      },
+      "text",
+    );
+    const current = action(l.id === activeLayer ? "Aktivt" : "Aktivera", () => {
+      activeLayer = l.id;
+      renderLayers();
+      renderInspector();
+    });
+    row.append(color, rename, lineType, eye, lock, current);
     root.append(row);
   }
   const b = document.createElement("button");
@@ -3280,14 +3812,13 @@ function renderLayers() {
   root.append(b);
 }
 function panel(which) {
-  $("#properties-panel").hidden = which !== "properties";
-  $("#layers-panel").hidden = which !== "layers";
-  $$("[data-panel]").forEach((b) =>
-    b.classList.toggle("active", b.dataset.panel === which),
-  );
+  if (which === "layers") {
+    renderLayers();
+    $("#layer-dialog").showModal();
+  } else if ($("#layer-dialog").open) $("#layer-dialog").close();
 }
-$$("[data-panel]").forEach((b) => (b.onclick = () => panel(b.dataset.panel)));
 $("#layers-tab").onclick = () => panel("layers");
+$("#close-layers").onclick = () => $("#layer-dialog").close();
 document.addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-command]");
   if (b) start(b.dataset.command);
@@ -3317,7 +3848,105 @@ function download(name, text, type) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+function beginBlockEdit(entity) {
+  if (blockEditor || entity?.type !== "block" || !editable(entity)) {
+    log("Markera ett block som kan redigeras först.");
+    return;
+  }
+  if (inlineEdit) finishTextEdit(true);
+  syncViewport();
+  clearTimeout(savingTimer);
+  try {
+    localStorage.setItem("liracad-v1", JSON.stringify(doc));
+  } catch {}
+  blockEditor = {
+    document: doc,
+    history,
+    activeSpace,
+    activeViewportId,
+    paperCamera,
+    camera: { ...camera },
+    activeLayer,
+    dirty,
+    selection: new Set(selection),
+    id: entity.definition.id,
+  };
+  doc = {
+    version: 1,
+    name: entity.definition.name,
+    layers: clone(doc.layers),
+    entities: clone(entity.definition.entities).map((e) => ({
+      ...e,
+      space: "model",
+    })),
+    blockBase: { x: 0, y: 0 },
+  };
+  history = new History();
+  activeSpace = "model";
+  activeViewportId = null;
+  paperCamera = null;
+  cancel();
+  fit();
+  panel("properties");
+  log(
+    "Blockeditor · redigera med ritverktygen · BSAVE sparar · BCANCEL avbryter.",
+  );
+}
+function finishBlockEdit(save) {
+  if (!blockEditor) return false;
+  if (inlineEdit) finishTextEdit(save);
+  let next;
+  if (save) {
+    try {
+      next = updateBlockDefinition(blockEditor.document, blockEditor.id, doc);
+      if (!validDocument(next))
+        throw Error("Blocket innehåller ogiltiga objekt eller lager.");
+    } catch (e) {
+      log(e.message);
+      return false;
+    }
+  }
+  const session = blockEditor;
+  blockEditor = null;
+  doc = session.document;
+  history = session.history;
+  activeSpace = session.activeSpace;
+  activeViewportId = session.activeViewportId;
+  paperCamera = session.paperCamera;
+  camera = session.camera;
+  activeLayer = session.activeLayer;
+  dirty = session.dirty;
+  cancel();
+  selection = session.selection;
+  if (save) commit("Redigera block", () => (doc = next));
+  else update();
+  persisted();
+  log(
+    save
+      ? "Blocket sparat. Alla instanser är uppdaterade."
+      : "Blockredigering avbruten.",
+  );
+  return true;
+}
+window.addEventListener("pagehide", () => {
+  // Flush the debounce when leaving immediately after editing an attribute.
+  try {
+    localStorage.setItem(
+      "liracad-v1",
+      JSON.stringify(blockEditor?.document || doc),
+    );
+  } catch {}
+});
+window.addEventListener("beforeunload", (event) => {
+  if (blockEditor) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+
 function saveProject() {
+  if (blockEditor && !finishBlockEdit(true)) return;
   download(
     `${doc.name}.liracad`,
     JSON.stringify(doc, null, 2),
@@ -3327,20 +3956,61 @@ function saveProject() {
   log("Projektfil sparad.");
 }
 function exportDxf() {
+  if (blockEditor) {
+    log("Spara eller avbryt blockredigeringen först.");
+    return;
+  }
   download(`${doc.name}.dxf`, toDXF(doc), "application/dxf");
   log(
-    "DXF exporterad · layouter och viewports bevaras. Mått exporteras som linjer/bågar/text.",
+    "DXF exporterad · block, attribut, bågpolylinjer och native mått bevaras.",
   );
 }
 $("#save-file").onclick = saveProject;
 $("#export-dxf").onclick = exportDxf;
 $("#open-file").onclick = () => $("#file-input").click();
+$("#close-import").onclick = () => $("#import-dialog").close();
+function readDXFFile(file) {
+  const dwg = /\.dwg$/i.test(file.name);
+  return file.arrayBuffer().then(
+    (buffer) =>
+      new Promise((resolve, reject) => {
+        const worker = new Worker(
+          new URL(dwg ? "./dwg-import-worker.js" : "./dxf-import-worker.js", import.meta.url),
+          { type: "module" },
+        );
+        const timer = setTimeout(() => {
+          worker.terminate();
+          reject(Error(`${dwg ? "DWG" : "DXF"}-importen tog för lång tid.`));
+        }, 60000);
+        const done = () => {
+          clearTimeout(timer);
+          worker.terminate();
+        };
+        worker.onmessage = ({ data }) => {
+          if(data.progress) {log(data.progress);return;}
+          done();
+          data.error ? reject(Error(data.error)) : resolve(data.result);
+        };
+        worker.onerror = () => {
+          done();
+          reject(Error(`${dwg ? "DWG" : "DXF"}-importen kunde inte startas.`));
+        };
+        worker.postMessage({ buffer, name: file.name }, [buffer]);
+      }),
+  );
+}
+let importing = false;
 $("#file-input").onchange = async (ev) => {
   const f = ev.target.files[0];
-  if (!f) return;
+  if (!f || importing || blockEditor) return;
+  importing = true;
   try {
     if (f.size > 50e6) throw Error("Filen är för stor (max 50 MB).");
-    const d = JSON.parse(await f.text());
+    const isDXF = /\.(dxf|dwg)$/i.test(f.name);
+    if (isDXF) log(/\.dwg$/i.test(f.name) ? "Öppnar DWG lokalt…" : "Läser DXF…");
+    const imported = isDXF ? await readDXFFile(f) : null;
+    const d = imported ? imported.document : JSON.parse(await f.text());
+    if (blockEditor) throw Error("Avsluta blockeditorn och öppna filen igen.");
     if (!validDocument(d)) throw Error("Ogiltig projektfil.");
     commit("Öppna projekt", () => {
       doc = d;
@@ -3352,9 +4022,23 @@ $("#file-input").onchange = async (ev) => {
     cancel();
     fit();
     log(`Öppnat ${f.name}`);
+    if (imported) {
+      $("#import-dialog h2").textContent = /\.dwg$/i.test(f.name) ? "DWG-import" : "DXF-import";
+      $("#import-summary").textContent =
+        `${imported.count} objekt inlästa. ${imported.report.length ? "Följande avvikelser hittades:" : "Inga kända importavvikelser hittades."}`;
+      $("#import-issues").replaceChildren(
+        ...imported.report.map((item) => {
+          const li = document.createElement("li");
+          li.textContent = `${item.message} (${item.count})`;
+          return li;
+        }),
+      );
+      $("#import-dialog").showModal();
+    }
   } catch (e) {
     log(`Kunde inte öppna: ${e.message}`);
   }
+  importing = false;
   ev.target.value = "";
 };
 $("#new-file").onclick = () => {
@@ -3436,7 +4120,10 @@ if (restoreError)
   log("Det lokala utkastet kunde inte läsas. Exempelritningen har öppnats.");
 
 setupPWA(() => {
-  if (tool || drag) return "Avsluta eller avbryt pågående kommando före uppdatering.";
+  if (blockEditor)
+    return "Spara eller avbryt blockredigeringen före uppdatering.";
+  if (tool || drag)
+    return "Avsluta eller avbryt pågående kommando före uppdatering.";
   if (inlineEdit) finishTextEdit(true);
   syncViewport();
   localStorage.setItem("liracad-v1", JSON.stringify(doc));

@@ -10,6 +10,7 @@ const types = {
   ".json": "application/json",
   ".webmanifest": "application/manifest+json",
   ".png": "image/png",
+  ".wasm": "application/wasm",
 };
 http
   .createServer(async (req, res) => {

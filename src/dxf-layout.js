@@ -1,5 +1,5 @@
 // Layout ownership, paper blocks and native rectangular VIEWPORT entities.
-export function dxfLayouts(doc, pair) {
+export function dxfLayouts(doc, pair, custom = []) {
   let next = 256;
   const handle = () => (next++).toString(16).toUpperCase();
   const root = handle(),
@@ -22,7 +22,9 @@ export function dxfLayouts(doc, pair) {
     record: handle(),
     object: handle(),
   }));
+  for (const b of custom) b.record = handle();
   const owner = (e) =>
+    e._owner ||
     layouts.find((l) => l.id === (e.space || "model"))?.record ||
     layouts[0].record;
   const tables = () => {
@@ -31,15 +33,15 @@ export function dxfLayouts(doc, pair) {
     pair(5, table);
     pair(330, 0);
     pair(100, "AcDbSymbolTable");
-    pair(70, layouts.length);
-    for (const l of layouts) {
+    pair(70, layouts.length + custom.length);
+    for (const l of [...layouts, ...custom]) {
       pair(0, "BLOCK_RECORD");
       pair(5, l.record);
       pair(330, table);
       pair(100, "AcDbSymbolTableRecord");
       pair(100, "AcDbBlockTableRecord");
       pair(2, l.blockName);
-      pair(340, l.object);
+      if (l.object) pair(340, l.object);
       pair(70, 4);
     }
     pair(0, "ENDTAB");
@@ -47,7 +49,7 @@ export function dxfLayouts(doc, pair) {
   const blocks = (content = () => {}) => {
     pair(0, "SECTION");
     pair(2, "BLOCKS");
-    for (const l of layouts) {
+    for (const l of [...layouts, ...custom]) {
       pair(0, "BLOCK");
       pair(5, handle());
       pair(330, l.record);
@@ -55,7 +57,7 @@ export function dxfLayouts(doc, pair) {
       pair(8, "0");
       pair(100, "AcDbBlockBegin");
       pair(2, l.blockName);
-      pair(70, 0);
+      pair(70, l.flags || 0);
       pair(10, 0);
       pair(20, 0);
       pair(30, 0);

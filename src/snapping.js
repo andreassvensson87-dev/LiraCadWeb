@@ -1,3 +1,5 @@
+import { blockParts } from "./blocks.js";
+import { polylineParts, hasBulges } from "./polyline.js";
 import {
   dist,
   sub,
@@ -53,6 +55,13 @@ export function createSnapIndex(entities) {
     edges = [];
   for (const e of entities) {
     points.push(...snapPoints(e).map((p) => ({ ...p, id: e.id })));
+    if (e.type === "block" || hasBulges(e)) {
+      const nested = createSnapIndex(
+        e.type === "block" ? blockParts(e) : polylineParts(e),
+      );
+      edges.push(...nested.edges.map((edge) => ({ ...edge, id: e.id })));
+      continue;
+    }
     if (["circle", "arc"].includes(e.type))
       edges.push({
         ...e,

@@ -1,4 +1,10 @@
 import {
+  polylineParts,
+  hasBulges,
+  pathVertices,
+  reversePath,
+} from "./polyline.js";
+import {
   add,
   sub,
   mul,
@@ -21,6 +27,7 @@ export function infiniteIntersection(a, b, c, d) {
   return add(a, mul(v, cross(sub(c, a), w) / den));
 }
 export function polylineOffset(e, d, p) {
+  if (hasBulges(e)) return null;
   const pts = e.points,
     count = pts.length - (e.closed ? 0 : 1);
   if (!(d > 0) || count < 1) return null;
@@ -88,29 +95,49 @@ export function polylineOffset(e, d, p) {
 export function joinEntities(entities, tolerance = 1e-6) {
   if (
     entities.length < 2 ||
-    entities.some((e) => !["line", "polyline"].includes(e.type) || e.closed)
+    entities.some(
+      (e) =>
+        !["line", "polyline", "arc"].includes(e.type) ||
+        e.closed ||
+        (e.type === "arc" && Math.abs(e.sweep) >= Math.PI * 2 - 1e-8),
+    )
   )
-    throw Error("Välj minst två öppna linjer/polylinjer.");
+    throw Error("Välj öppna linjer, bågar eller polylinjer.");
   if (
     entities.some(
       (e) => (e.space || "model") !== (entities[0].space || "model"),
     )
   )
     throw Error("Objekten måste finnas i samma utrymme.");
-  const remaining = entities.slice(1).map(clone),
-    points = clone(entities[0].points);
+  let path = pathVertices(entities[0]);
+  const remaining = entities.slice(1).map(pathVertices);
   while (remaining.length) {
     let found = false;
     for (let i = 0; i < remaining.length; i++) {
-      let p = remaining[i].points;
-      if (dist(points.at(-1), p[0]) <= tolerance) points.push(...p.slice(1));
-      else if (dist(points.at(-1), p.at(-1)) <= tolerance)
-        points.push(...p.slice().reverse().slice(1));
-      else if (dist(points[0], p.at(-1)) <= tolerance)
-        points.unshift(...p.slice(0, -1));
-      else if (dist(points[0], p[0]) <= tolerance)
-        points.unshift(...p.slice().reverse().slice(0, -1));
-      else continue;
+      let q = remaining[i];
+      if (dist(path.points.at(-1), q.points[0]) <= tolerance) {
+      } else if (dist(path.points.at(-1), q.points.at(-1)) <= tolerance)
+        q = reversePath(q);
+      else if (dist(path.points[0], q.points.at(-1)) <= tolerance) {
+        path = {
+          points: [...q.points.slice(0, -1), ...path.points],
+          bulges: [...q.bulges, ...path.bulges],
+        };
+        remaining.splice(i, 1);
+        found = true;
+        break;
+      } else if (dist(path.points[0], q.points[0]) <= tolerance) {
+        q = reversePath(q);
+        path = {
+          points: [...q.points.slice(0, -1), ...path.points],
+          bulges: [...q.bulges, ...path.bulges],
+        };
+        remaining.splice(i, 1);
+        found = true;
+        break;
+      } else continue;
+      path.points.push(...q.points.slice(1));
+      path.bulges.push(...q.bulges);
       remaining.splice(i, 1);
       found = true;
       break;
@@ -118,25 +145,26 @@ export function joinEntities(entities, tolerance = 1e-6) {
     if (!found)
       throw Error("Ändpunkterna måste mötas i en sammanhängande kedja.");
   }
-  const closed = dist(points[0], points.at(-1)) <= tolerance;
-  if (closed) points.pop();
-  if (points.length < (closed ? 3 : 2)) throw Error("Konturen är för kort.");
-  return { ...clone(entities[0]), id: uid(), type: "polyline", closed, points };
+  const closed = dist(path.points[0], path.points.at(-1)) <= tolerance;
+  if (closed) path.points.pop();
+  if (path.points.length < 2) throw Error("Konturen är för kort.");
+  return {
+    id: uid(),
+    layer: entities[0].layer,
+    color: entities[0].color,
+    space: entities[0].space,
+    type: "polyline",
+    closed,
+    ...path,
+  };
 }
 export function explodePolyline(e) {
-  if (e.type !== "polyline") throw Error("EXPLODE stöder polylinjer.");
-  return Array.from(
-    { length: e.points.length - (e.closed ? 0 : 1) },
-    (_, i) => ({
-      ...clone(e),
-      id: uid(),
-      type: "line",
-      closed: false,
-      points: [e.points[i], e.points[(i + 1) % e.points.length]],
-    }),
-  );
+  if (e.type !== "polyline") throw Error("Välj polylinjer, block eller mått.");
+  return polylineParts(e).map((part) => ({ ...part, id: uid() }));
 }
 export function insertVertex(e, p) {
+  if (hasBulges(e))
+    throw Error("Dela upp polylinjen med X före hörnredigering av bågsegment.");
   const n = clone(e);
   let best = Infinity,
     index = 0;
@@ -153,10 +181,13 @@ export function insertVertex(e, p) {
   }
   if (n.points.some((q) => dist(p, q) < 1e-8))
     throw Error("Punkten sammanfaller med ett befintligt hörn.");
+  delete n.bulges;
   n.points.splice(index + 1, 0, p);
   return n;
 }
 export function removeVertex(e, p) {
+  if (hasBulges(e))
+    throw Error("Dela upp polylinjen med X före hörnredigering av bågsegment.");
   if (e.points.length <= (e.closed ? 3 : 2))
     throw Error("Konturen behöver fler hörn för att ta bort ett.");
   const n = clone(e),
@@ -164,6 +195,7 @@ export function removeVertex(e, p) {
       (best, q, j) => (dist(p, q) < dist(p, n.points[best]) ? j : best),
       0,
     );
+  delete n.bulges;
   n.points.splice(i, 1);
   return n;
 }

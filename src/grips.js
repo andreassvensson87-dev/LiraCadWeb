@@ -1,13 +1,29 @@
+import { polylineParts, hasBulges } from "./polyline.js";
 import { clone, polar, dist, arcThrough } from "./core.js";
 
 export function grips(e) {
+  if (hasBulges(e))
+    return [
+      ...e.points.map((p, i) => ({ p, i, kind: "point" })),
+      ...polylineParts(e).flatMap((part, i) =>
+        part.type === "arc"
+          ? [
+              {
+                p: polar(part.center, part.radius, part.start + part.sweep / 2),
+                i,
+                kind: "bulge",
+              },
+            ]
+          : [],
+      ),
+    ];
   if (
     ["line", "polyline", "hatch", "leader", "dimension", "viewport"].includes(
       e.type,
     )
   )
     return e.points.map((p, i) => ({ p, i, kind: "point" }));
-  if (e.type === "text") return [{ p: e.point, kind: "text" }];
+  if (["text", "block"].includes(e.type)) return [{ p: e.point, kind: "text" }];
   if (e.type === "circle")
     return [
       { p: e.center, kind: "center" },
@@ -40,6 +56,15 @@ export function gripEntity(e, g, p) {
       };
     }
   }
+  if (g.kind === "bulge") {
+    const arc = arcThrough(
+      e.points[g.i],
+      p,
+      e.points[(g.i + 1) % e.points.length],
+    );
+    n.bulges ||= [];
+    n.bulges[g.i] = arc ? Math.tan(arc.sweep / 4) : 0;
+  }
   if (g.kind === "center") n.center = p;
   if (g.kind === "radius") n.radius = Math.max(0.001, dist(n.center, p));
   if (g.kind === "text") n.point = p;
@@ -52,4 +77,21 @@ export function gripEntity(e, g, p) {
     if (arc) Object.assign(n, arc);
   }
   return n;
+}
+
+// Group geometrically coincident grips, not merely nearby screen handles.
+export function gripTargets(entities, point) {
+  return entities.flatMap((entity) => {
+    const matching = grips(entity).filter((g) => dist(g.p, point) < 1e-7);
+    return matching.length ? [{ entity: clone(entity), grips: matching }] : [];
+  });
+}
+
+export function moveGripTargets(targets, point) {
+  return targets.map(({ entity, grips: handles }) =>
+    handles.reduce(
+      (result, handle) => gripEntity(result, handle, point),
+      entity,
+    ),
+  );
 }

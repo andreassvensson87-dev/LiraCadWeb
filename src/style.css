@@ -1296,5 +1296,118 @@ footer > div {
   letter-spacing: 0.05em;
 }
 
-#install-app[hidden], #update-app[hidden] { display: none; }
-#pwa-status { max-width: 230px; font-size: 11px; }
+#install-app[hidden],
+#update-app[hidden] {
+  display: none;
+}
+#pwa-status {
+  max-width: 230px;
+  font-size: 11px;
+}
+
+#space-tabs[hidden] {
+  display: none;
+}
+
+.attribute-manager {
+  margin: 12px 0;
+}
+.attribute-manager summary {
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 0;
+}
+.attribute-manager button {
+  margin-top: 4px;
+}
+#properties-panel .attribute-options {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.general-properties {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border, #e4e8e5);
+}
+#properties-panel > .inspector-section:first-child {
+  margin-top: 0;
+}
+#layer-dialog {
+  width: min(900px, 90vw);
+  border: 1px solid #d5ded8;
+  border-radius: 12px;
+  padding: 22px;
+  color: #283b32;
+  background: #fff;
+}
+#layer-dialog::backdrop {
+  background: #10231d66;
+}
+.layer-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.layer-dialog-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+#layer-dialog #layers-panel {
+  max-height: 65vh;
+  overflow: auto;
+  padding: 0;
+}
+#layer-dialog .layer-row {
+  display: grid;
+  grid-template-columns:
+    32px minmax(140px, 1fr) minmax(150px, 1fr)
+    32px 32px 80px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+}
+#layer-dialog .field {
+  margin: 0;
+}
+#layer-dialog button {
+  cursor: pointer;
+  padding: 7px;
+  border: 1px solid #d5ded8;
+  border-radius: 5px;
+  background: #f4f8f5;
+}
+#layer-dialog .layer-row.current {
+  background: #edf6ef;
+}
+#layer-dialog .layer-row.current::before {
+  display: none;
+}
+#layer-dialog .layer-row .field input {
+  width: 100%;
+  height: auto;
+  padding: 8px 9px;
+  border: 1px solid #dfe7e0;
+  background: #f5f8f5;
+}
+#layer-dialog {
+  max-width: 94vw;
+}
+#import-dialog {
+  width: min(680px, 90vw);
+}
+#import-issues {
+  max-height: 50vh;
+  overflow: auto;
+  padding-left: 20px;
+}
+#import-issues li {
+  margin: 8px 0;
+}
+#close-import {
+  padding: 8px 20px;
+  border: 1px solid #d5ded8;
+  border-radius: 5px;
+}

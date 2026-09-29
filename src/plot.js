@@ -1,3 +1,6 @@
+import { linePattern } from "./linetypes.js";
+import { blockParts } from "./blocks.js";
+import { polylineParts, hasBulges } from "./polyline.js";
 import { dimensionParts } from "./dimensions.js";
 import { pointsOf, polar, angle } from "./core.js";
 import { spaceOf } from "./layout.js";
@@ -19,9 +22,12 @@ export function layoutSVG(doc, layout) {
   const entity = (e) => {
     const layer = doc.layers.find((l) => l.id === e.layer);
     if (layer?.visible === false) return "";
+    if (e.type === "block") return blockParts(e).map(entity).join("");
+    if (hasBulges(e)) return polylineParts(e).map(entity).join("");
     if (e.type === "dimension") return dimensionParts(e).map(entity).join("");
     const color = e.color || "#253b31";
-    const stroke = `stroke="${escape(color)}" stroke-width="0.2" vector-effect="non-scaling-stroke" fill="none"`;
+    const dash = linePattern(e, layer).map(Math.abs).join(" ");
+    const stroke = `${dash ? `stroke-dasharray="${dash}" ` : ""}stroke="${escape(color)}" stroke-width="0.2" vector-effect="non-scaling-stroke" fill="none"`;
     if (e.type === "text")
       return `<g transform="translate(${e.point.x} ${e.point.y}) rotate(${((e.rotation || 0) * 180) / Math.PI}) scale(1 -1)"><text fill="${escape(color)}" font-family="${escape(e.font || "Arial")}" font-size="${e.height}" font-weight="${e.bold ? "bold" : "normal"}" font-style="${e.italic ? "italic" : "normal"}" text-decoration="${e.underline ? "underline" : "none"}">${e.text
         .split("\n")

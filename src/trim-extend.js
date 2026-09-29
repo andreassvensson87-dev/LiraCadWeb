@@ -1,3 +1,4 @@
+import { polylineParts, hasBulges } from "./polyline.js";
 import {
   add,
   sub,
@@ -18,9 +19,11 @@ const dot = (a, b) => a.x * b.x + a.y * b.y;
 const cross = (a, b) => a.x * b.y - a.y * b.x;
 const clamp = (x) => Math.max(0, Math.min(1, x));
 const shapes = (e) =>
-  ["circle", "arc"].includes(e.type)
-    ? [e]
-    : segments(e).map(([a, b]) => ({ type: "segment", a, b }));
+  hasBulges(e)
+    ? polylineParts(e).flatMap(shapes)
+    : ["circle", "arc"].includes(e.type)
+      ? [e]
+      : segments(e).map(([a, b]) => ({ type: "segment", a, b }));
 function intersections(a, b) {
   if (a.type !== "segment" && b.type === "segment")
     return intersections(b, a).filter(
@@ -110,6 +113,8 @@ function subpath(edges, from, to) {
   return points;
 }
 export function trimExtend(e, boundaries, p, mode) {
+  if (e && hasBulges(e))
+    throw Error("Dela upp bågpolylinjen med X före TRIM/EXTEND.");
   if (!e || !["line", "polyline", "arc"].includes(e.type))
     throw Error("Välj en linje, båge eller rak polylinje.");
   const limits = boundaries.filter((b) => b.id !== e.id).flatMap(shapes);

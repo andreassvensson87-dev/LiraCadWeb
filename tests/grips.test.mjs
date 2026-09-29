@@ -1,7 +1,100 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { grips, gripEntity } from "../src/grips.js";
+import {
+  grips,
+  gripEntity,
+  gripTargets,
+  moveGripTargets,
+} from "../src/grips.js";
 import { demoDocument, polar, dist } from "../src/core.js";
+
+test("shared line endpoints move together without moving nearby grips or originals", () => {
+  const entities = [
+    {
+      id: "a",
+      type: "line",
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ],
+    },
+    {
+      id: "b",
+      type: "line",
+      points: [
+        { x: 0, y: 10 },
+        { x: 0, y: 0 },
+      ],
+    },
+    { id: "near", type: "text", point: { x: 0.01, y: 0 }, text: "near" },
+  ];
+  const before = structuredClone(entities);
+  const targets = gripTargets(entities, { x: 0, y: 0 });
+  assert.deepEqual(
+    targets.map((t) => t.entity.id),
+    ["a", "b"],
+  );
+  const moved = moveGripTargets(targets, { x: 2, y: 3 });
+  assert.deepEqual(moved[0].points, [
+    { x: 2, y: 3 },
+    { x: 10, y: 0 },
+  ]);
+  assert.deepEqual(moved[1].points, [
+    { x: 0, y: 10 },
+    { x: 2, y: 3 },
+  ]);
+  assert.deepEqual(entities, before);
+  assert.deepEqual(moveGripTargets(targets, { x: 4, y: 5 })[0].points[0], {
+    x: 4,
+    y: 5,
+  });
+});
+
+test("coincident vertices within one polyline are updated in the same result", () => {
+  const entity = {
+    id: "p",
+    type: "polyline",
+    points: [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 0, y: 0 },
+    ],
+  };
+  const moved = moveGripTargets(gripTargets([entity], entity.points[0]), {
+    x: 3,
+    y: 4,
+  });
+  assert.equal(moved.length, 1);
+  assert.deepEqual(moved[0].points, [
+    { x: 3, y: 4 },
+    { x: 10, y: 0 },
+    { x: 3, y: 4 },
+  ]);
+});
+
+test("shared grips across line, circle and text retain their own editing semantics", () => {
+  const entities = [
+    {
+      id: "l",
+      type: "line",
+      points: [
+        { x: 5, y: 0 },
+        { x: 20, y: 0 },
+      ],
+    },
+    { id: "c", type: "circle", center: { x: 0, y: 0 }, radius: 5 },
+    { id: "t", type: "text", point: { x: 5, y: 0 }, text: "A" },
+  ];
+  const moved = moveGripTargets(gripTargets(entities, { x: 5, y: 0 }), {
+    x: 8,
+    y: 0,
+  });
+  assert.equal(moved.length, 3);
+  assert.deepEqual(moved[0].points[0], { x: 8, y: 0 });
+  assert.equal(moved[1].radius, 8);
+  assert.deepEqual(moved[1].center, { x: 0, y: 0 });
+  assert.deepEqual(moved[2].point, { x: 8, y: 0 });
+});
 
 test("every supported demo object has editable grips", () => {
   for (const e of demoDocument().entities) assert.ok(grips(e).length, e.type);

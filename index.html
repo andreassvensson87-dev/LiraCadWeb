@@ -153,19 +153,12 @@
       <aside>
         <div class="inspector-header">
           <div>
-            <span class="eyebrow">INSPECTOR</span>
             <h1>Egenskaper</h1>
           </div>
           <span class="selection-badge" id="selection-badge">0</span>
         </div>
-        <div class="side-tabs">
-          <button class="active" data-panel="properties">Egenskaper</button
-          ><button data-panel="layers">
-            Lager <span id="layer-count">4</span>
-          </button>
-        </div>
         <div id="properties-panel"></div>
-        <div id="layers-panel" hidden></div>
+
         <div class="inspector-foot">
           <span class="live-dot"></span>
           <div>
@@ -174,6 +167,19 @@
         </div>
       </aside>
     </main>
+    <dialog id="import-dialog" aria-label="Importresultat">
+      <h2>DXF-import</h2>
+      <p id="import-summary"></p>
+      <ul id="import-issues"></ul>
+      <form method="dialog"><button id="close-import">Stäng</button></form>
+    </dialog>
+    <dialog id="layer-dialog" aria-label="Lagereditor">
+      <div class="layer-dialog-header">
+        <h2>Lager <span id="layer-count"></span></h2>
+        <button id="close-layers">Stäng</button>
+      </div>
+      <div id="layers-panel"></div>
+    </dialog>
     <section class="command-panel">
       <div class="command-log" id="command-log" aria-live="polite"></div>
       <span id="snap-feedback" aria-live="polite"></span>
@@ -228,7 +234,7 @@
         ><span id="zoom-level">100%</span>
       </div>
     </footer>
-    <input type="file" id="file-input" accept=".json,.liracad" hidden />
+    <input type="file" id="file-input" accept=".json,.liracad,.dxf,.dwg" hidden />
     <dialog id="help-dialog">
       <button class="dialog-close" id="close-help">×</button
       ><span class="eyebrow">VÄLKOMMEN TILL LIRACAD</span>
@@ -287,7 +293,7 @@
         F3: objektsnapp. F10: Polar med valt vinkelsteg. F11: Track — stanna
         över en snappunkt för att fånga en referens, följ sedan hjälplinjen. F8:
         Ortho. Första utgåvan: lokal projektlagring och DXF-export.
-        DWG/DXF-import kommer i en senare etapp. Offset stöder linjer, raka
+        DWG/DXF-import finns med rapport över förenklingar. Offset stöder linjer, raka
         polylinjer, cirklar och bågar. Enter avslutar polylinje/skraffering; Esc
         avbryter. Dra en markerad linjes ändpunkt för att ändra den.
       </p>

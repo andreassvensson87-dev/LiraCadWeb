@@ -40,14 +40,14 @@ På den här datorn finns också `Starta LiraCAD.command`, som använder Codex m
 | DI           | Mät avstånd                                                     |
 | U / REDO     | Ångra / gör om                                                  |
 
-Flytta, kopiera, rotera, skala och spegla fungerar för flerval. Spegla ersätter valda objekt. Skala använder positiv faktor; vid musinmatning motsvarar 1 000 mm från baspunkten faktor 1. Grips finns på linjer, polylinjer, hatch, leader, cirklar och text. Trim och Extend ingår inte ännu. Fillet och Chamfer stöder två raka linjer.
+Flytta, kopiera, rotera, skala och spegla fungerar för flerval. Spegla ersätter valda objekt. Skala använder positiv faktor; vid musinmatning motsvarar 1 000 mm från baspunkten faktor 1. Grips finns på linjer, polylinjer, hatch, leader, cirklar och text. Trim och Extend finns för linjer, bågar och raka polylinjer. Fillet och Chamfer stöder två raka linjer.
 
 ## Filer
 
 - **Spara projekt** laddar ned en `.liracad`-fil; **Öppna projekt** läser tillbaka den.
 - Dokumentet autosparas i webbläsaren. Spara till fil för en separat säkerhetskopia. Ångrahistoriken bevaras under sessionen, inte efter omladdning.
 - **Exportera DXF** skriver DXF R2007 (UTF-8) med millimeter, lager/färger och native LINE, LWPOLYLINE, CIRCLE, ARC, TEXT, MTEXT, LEADER och HATCH. Leaderns text skrivs som separat TEXT/MTEXT, utan associativ koppling.
-- **DWG- och DXF-import finns inte i denna utgåva.** Formatmålet är fortfarande DWG/DXF in och DXF ut; se PLAN.md.
+- **DWG- och ASCII DXF-import finns i en första version.** Se importstöd och begränsningar nedan.
 - Ny ritning, exempelritning och öppnat projekt går att ångra under samma session.
 
 ## Teknik och begränsningar
@@ -90,7 +90,7 @@ Polylinjer med bågsegment/bulges och Fillet/Chamfer direkt på polylinjehörn i
 
 `DLI` linjärt, `DAL` riktat, `DAN` vinkel, `DRA` radie och `DDI` diameter finns också som knappar under Måttsätt. För DLI/DAL klickar du två eller fler mätpunkter, trycker Enter och placerar sedan hela måttlinjen. Kedjan sparas som ett objekt: val, flytt, rotation, skala och stil gäller hela kedjan. Greppet på måttlinjen flyttar dess placering; mätpunkternas grepp ändrar angränsande delmått. DAL använder de två första punkterna för kedjans gemensamma riktning. Vinkelmått använder spets, två riktningspunkter och placering. Radie/diameter använder en vald cirkel/båge och textplacering. DLI väljer horisontell/vertikal riktning efter placeringen.
 
-Mått sparas som egna redigerbara projektobjekt med greppunkter, texthöjd, precision och, för enskilda mått, valfri textöverskrivning. Måttet räknas om när dess grepp ändras. **Mått är inte associativt kopplade till andra objekts geometri. DXF-exporten delar upp mått i linjer/bågar/text, inte native DIMENSION.**
+Mått sparas som egna redigerbara projektobjekt med greppunkter, texthöjd, precision och, för enskilda mått, valfri textöverskrivning. Måttet räknas om när dess grepp ändras. **Mått är inte associativt kopplade till andra objekts geometri. DXF-exporten skriver native DIMENSION med måttstil och visningsblock.**
 
 ## Layout och viewports
 
@@ -154,3 +154,80 @@ Modeller, ritningar och bibliotek i webbläsarens lagring ingår inte i kodbacku
 Manifest, ikoner och offlinecache ingår i produktionsbygget. Appadressen och
 installationen behålls. Offline fungerar efter första lyckade cacheinstallationen.
 Webbläsarens lagring kan rensas och ersätter inte projektbackuper.
+
+## Block, attribut och bågpolylinjer
+
+- **BLOCK / B:** markera objekt, ange ett unikt blocknamn och välj baspunkt. **INSERT / I:** ange blocknamnet och välj insättningspunkt. Knappar finns under Redigera. Definitionerna bevaras i projektet även om sista instansen raderas. Kopiera, flytta, rotera, skala, spegla, snap och insättningsgrepp fungerar. **X / EXPLODE** delar upp blocket igen.
+- **ATTDEF / ATT:** markera en enkelradig text och ange ett attributnamn (A–Z, 0–9, _). Ta med texten när blocket skapas. Varje infogat block har egna värden som ändras i inspektorn. Nya instanser får definitionens standardvärden. Nästlade/dynamiska block, BEDIT och multiline-attribut ingår inte i denna första version.
+- **PL / PLINE:** välj startpunkt och fortsätt med raka segment. **A** växlar till båge via en mellanpunkt och en slutpunkt. **L** återgår till linje, **U** ångrar senaste segment/mellanpunkt, **C** sluter med en rak kant och Enter avslutar. Bågens mittgrepp ändrar krökningen. JOIN kan sammanfoga linjer, bågar och öppna polylinjer; EXPLODE ger tillbaka linjer och bågar. Bågsegment lagras som DXF-bulge, inte som korta raka linjer.
+- OFFSET, TRIM/EXTEND och lägg till/ta bort hörn stöder ännu inte bågpolylinjer som redigeringsmål; kommandot säger till. Dela upp med X först. Bågpolylinjer fungerar som trimgränser.
+- DXF-export skriver BLOCK/INSERT, ATTDEF/ATTRIB, LWPOLYLINE med bulge och riktiga DIMENSION-objekt med DIMSTYLE och anonyma visningsblock. Måttkedjor blir separata redigerbara delmått i DXF. Måtten är ännu inte associativt kopplade till den måttsatta geometrin. Export har kontrollerats med ezdxf; öppning/regenerering i AutoCAD behöver också provas med riktiga filer.
+
+DXF-referenser: [INSERT](https://help.autodesk.com/cloudhelp/2021/ENU/AutoCAD-DXF/files/GUID-28FA4CFB-9D5E-4880-9F11-36C97578252F.htm), [LWPOLYLINE](https://help.autodesk.com/cloudhelp/2015/ENU/AutoCAD-DXF/files/GUID-748FC305-F3F2-4F74-825A-61F04D757A50.htm), [DIMENSION](https://help.autodesk.com/cloudhelp/2023/ENU/AutoCAD-DXF/files/GUID-239A1BDD-7459-4BB9-8DD7-08EC79BF1EB0.htm).
+
+### Blockeditor
+Dubbelklicka på ett block eller markera det och kör `BEDIT` (`BE`). Blocket
+öppnas isolerat i lokala koordinater med de vanliga ritverktygen och egen
+ångrahistorik. Inspektorn visar blocknamn och baspunkt; markera en attributtext
+för att ändra dess namn, standardtext och utseende.
+
+`BSAVE` eller **Spara block** uppdaterar alla instanser och blockbiblioteket.
+Placering, rotation, skala och individuella attributvärden behålls (även när
+attributnamnet ändras på samma textobjekt). Nya attribut får standardvärdet.
+Baspunkten blir definitionens nya origo; instansernas insättningspunkter ligger
+kvar. `BCANCEL` eller **Avbryt blockredigering** kastar utkastet. Den sparade
+ändringen kan ångras som ett steg i huvudritningen. Blockutkast autosparas inte;
+webbläsaren varnar om du lämnar sidan. Nästlade och dynamiska block stöds inte.
+
+### Attributfält i inspektorn
+Markerade block visar sina attribut överst i inspektorn: fritext, dropdown eller
+datum. Ändringen gäller bara det markerade exemplaret. I blockeditorn väljer du
+ett attribut via listan **Attribut** eller genom att markera attributtexten.
+Där kan du ange etikett, fälttyp, standardvärde, ordning och egna val (ett per rad).
+Du bestämmer själv fälttyp och alla alternativ. Dropdown kan
+även tillåta egen text. **Gör till vanlig text** tar bort attributfunktionen.
+
+Spara blocket för att uppdatera fältdefinitionerna i alla exemplar. Deras befintliga
+värden behålls, även om ett gammalt värde inte längre finns i listan. Projektfilen
+bevarar fälttyper och valalternativ; DXF innehåller det valda värdet som vanlig
+attributtext.
+
+### Egenskaper och lager
+Inspektorn visar alltid lager, färg och linjetyp överst. Objektets specifika fält
+visas därefter. Lagerknappen i verktygsraden öppnar en separat lagereditor för
+namn, färg, linjetyp, synlighet, låsning och aktivt lager.
+
+Linjetyper: Enligt lager, Heldragen, Streckad, Prickad, Centrumlinje och Dold
+linje. Val utan markering används för nya objekt; med markering ändras objekten.
+Mönstren anges i ritningsenheter och bevaras i projekt, DXF och SVG-export.
+
+### DXF-import (första versionen)
+**Öppna projekt** accepterar nu även ASCII `.dxf` (max 50 MB). Filen bearbetas
+lokalt i en web worker. Importen ersätter den aktuella ritningen och kan ångras.
+En rapport visar objekt som hoppats över och kända förenklingar.
+
+Stöd: LINE, CIRCLE, ARC, 2D LWPOLYLINE/POLYLINE inklusive bulge, TEXT/MTEXT,
+vanliga INSERT/ATTDEF/ATTRIB, fem måtttyper, raka LEADER, enkla polygonhatch,
+layouter och oroterade rektangulära viewports. Lager och ACI/true color läses.
+Blockens dropdown-definitioner är LiraCAD-projektdata och finns inte i DXF.
+
+Begränsningar: binär DXF, splines, 3D, blockmatriser,
+olikformig blockskala, solid hatch och hatch med hål/kurvor saknar stöd.
+Textjustering/rik formatering och måttutseende kan avvika. Egna linjemönster
+ersätts med appens mönster. Koordinater behålls utan enhetsomräkning; andra
+ritningsenheter än mm rapporteras. Kontrollera mått innan praktisk användning.
+
+### DWG-import (första versionen)
+Öppna `.dwg` med **Öppna projekt**. ACadSharp 3.8.0 (MIT) körs i .NET 10
+WebAssembly i en separat web worker. Filen skickas inte till någon server.
+En DXF-representation skapas bara i minnet och läses av samma importör som ovan.
+Resultatet är redigerbara LiraCAD-objekt, med samma begränsningar som DXF-importen.
+Nästlade block förenklas till geometri i den yttre blockdefinitionen; dynamiska
+funktioner bevaras inte. Specialobjekt kan saknas helt och rapporteras vid import.
+Spara som LiraCAD-projekt eller exportera DXF. DWG-export ingår inte.
+
+Den medföljande läsaren stöder DWG-format AC1014–AC1032. Alla filer och
+objekttyper är inte verifierade. Testad i webbläsaren med ACadSharps
+`sample_AC1032.dwg` (111 inlästa objekt, rapporterade avvikelser).
+Runtimefilerna är cirka 27 MB och ingår i PWA-cachen för användning offline.
+Licenser och bygginstruktioner: `tools/DwgBridge/README.md`.

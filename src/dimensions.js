@@ -173,6 +173,7 @@ export function dimensionParts(e) {
     ...part,
     layer: e.layer,
     color: e.color,
+    lineType: e.lineType,
     space: e.space,
   }));
 }
