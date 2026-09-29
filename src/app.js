@@ -1,3 +1,7 @@
+import { toDXF } from "./dxf-export.js";
+import { History } from "./history.js";
+import { readDrawingFile } from "./file-import.js";
+import { ProjectStorage } from "./project-storage.js";
 import { lineTypes, linePattern } from "./linetypes.js";
 import {
   attributeSchema,
@@ -62,10 +66,8 @@ import {
   rectSelect,
   transformed,
   offset,
-  History,
   validDocument,
   demoDocument,
-  toDXF,
 } from "./core.js";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => [...document.querySelectorAll(s)];
@@ -203,14 +205,10 @@ for (const [i, [name, label, a]] of definitions
 }
 let inlineEdit = null;
 let blockEditor = null;
-let doc = demoDocument(),
-  restoreError = false;
-try {
-  const d = JSON.parse(localStorage.getItem("liracad-v1"));
-  if (validDocument(d)) doc = d;
-} catch {
-  restoreError = true;
-}
+const projectStorage = new ProjectStorage(() => localStorage);
+const restored = projectStorage.restore(validDocument);
+let doc = restored.document || demoDocument();
+const restoreError = restored.error;
 let activeLayer = doc.layers[0].id,
   selection = new Set(),
   history = new History(),
@@ -239,7 +237,6 @@ let width = 1,
   dpr = 1,
   camera = { x: 0, y: 0, scale: 0.075 },
   drawPending = false,
-  savingTimer = null,
   snapCache = { points: [], edges: [] };
 let activeSpace = "model",
   activeViewportId = null,
@@ -544,17 +541,16 @@ function persisted() {
     $("#save-state").textContent = "Blockändringar ej sparade";
     return;
   }
-  clearTimeout(savingTimer);
   $("#save-state").textContent = "Sparar…";
-  savingTimer = setTimeout(() => {
-    try {
-      localStorage.setItem("liracad-v1", JSON.stringify(doc));
-      $("#save-state").textContent = "Autosparat lokalt";
-    } catch {
-      $("#save-state").textContent = "Spara projekt till fil";
-      log("Lokal autosparning misslyckades. Använd Spara projekt.");
-    }
-  }, 350);
+  projectStorage.schedule(
+    () => doc,
+    (error) => {
+      $("#save-state").textContent = error
+        ? "Spara projekt till fil"
+        : "Autosparat lokalt";
+      if (error) log("Lokal autosparning misslyckades. Använd Spara projekt.");
+    },
+  );
 }
 function update() {
   if (
@@ -3856,9 +3852,9 @@ function beginBlockEdit(entity) {
   }
   if (inlineEdit) finishTextEdit(true);
   syncViewport();
-  clearTimeout(savingTimer);
+  projectStorage.cancel();
   try {
-    localStorage.setItem("liracad-v1", JSON.stringify(doc));
+    projectStorage.save(doc);
   } catch {}
   blockEditor = {
     document: doc,
@@ -3932,10 +3928,7 @@ function finishBlockEdit(save) {
 window.addEventListener("pagehide", () => {
   // Flush the debounce when leaving immediately after editing an attribute.
   try {
-    localStorage.setItem(
-      "liracad-v1",
-      JSON.stringify(blockEditor?.document || doc),
-    );
+    projectStorage.save(blockEditor?.document || doc);
   } catch {}
 });
 window.addEventListener("beforeunload", (event) => {
@@ -3969,47 +3962,15 @@ $("#save-file").onclick = saveProject;
 $("#export-dxf").onclick = exportDxf;
 $("#open-file").onclick = () => $("#file-input").click();
 $("#close-import").onclick = () => $("#import-dialog").close();
-function readDXFFile(file) {
-  const dwg = /\.dwg$/i.test(file.name);
-  return file.arrayBuffer().then(
-    (buffer) =>
-      new Promise((resolve, reject) => {
-        const worker = new Worker(
-          new URL(dwg ? "./dwg-import-worker.js" : "./dxf-import-worker.js", import.meta.url),
-          { type: "module" },
-        );
-        const timer = setTimeout(() => {
-          worker.terminate();
-          reject(Error(`${dwg ? "DWG" : "DXF"}-importen tog för lång tid.`));
-        }, 60000);
-        const done = () => {
-          clearTimeout(timer);
-          worker.terminate();
-        };
-        worker.onmessage = ({ data }) => {
-          if(data.progress) {log(data.progress);return;}
-          done();
-          data.error ? reject(Error(data.error)) : resolve(data.result);
-        };
-        worker.onerror = () => {
-          done();
-          reject(Error(`${dwg ? "DWG" : "DXF"}-importen kunde inte startas.`));
-        };
-        worker.postMessage({ buffer, name: file.name }, [buffer]);
-      }),
-  );
-}
 let importing = false;
 $("#file-input").onchange = async (ev) => {
   const f = ev.target.files[0];
   if (!f || importing || blockEditor) return;
   importing = true;
   try {
-    if (f.size > 50e6) throw Error("Filen är för stor (max 50 MB).");
-    const isDXF = /\.(dxf|dwg)$/i.test(f.name);
-    if (isDXF) log(/\.dwg$/i.test(f.name) ? "Öppnar DWG lokalt…" : "Läser DXF…");
-    const imported = isDXF ? await readDXFFile(f) : null;
-    const d = imported ? imported.document : JSON.parse(await f.text());
+    const { document: d, imported } = await readDrawingFile(f, {
+      onProgress: log,
+    });
     if (blockEditor) throw Error("Avsluta blockeditorn och öppna filen igen.");
     if (!validDocument(d)) throw Error("Ogiltig projektfil.");
     commit("Öppna projekt", () => {
@@ -4023,7 +3984,9 @@ $("#file-input").onchange = async (ev) => {
     fit();
     log(`Öppnat ${f.name}`);
     if (imported) {
-      $("#import-dialog h2").textContent = /\.dwg$/i.test(f.name) ? "DWG-import" : "DXF-import";
+      $("#import-dialog h2").textContent = /\.dwg$/i.test(f.name)
+        ? "DWG-import"
+        : "DXF-import";
       $("#import-summary").textContent =
         `${imported.count} objekt inlästa. ${imported.report.length ? "Följande avvikelser hittades:" : "Inga kända importavvikelser hittades."}`;
       $("#import-issues").replaceChildren(
@@ -4126,5 +4089,5 @@ setupPWA(() => {
     return "Avsluta eller avbryt pågående kommando före uppdatering.";
   if (inlineEdit) finishTextEdit(true);
   syncViewport();
-  localStorage.setItem("liracad-v1", JSON.stringify(doc));
+  projectStorage.save(doc);
 });

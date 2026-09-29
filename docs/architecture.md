@@ -1,0 +1,34 @@
+# Ansvar i LiraCAD
+
+Första uppdelningen av kärnan. Befintligt projektformat och ritbeteende behålls.
+
+- `app.js`: kopplar DOM, ritverktyg och aktivt dokument. Äger tills vidare
+  markering, kamera, blockeditorns session och när dokumentändringar tillämpas.
+- `history.js`: isolerade dokumentögonblicksbilder, ångra/gör om och historikgräns.
+  Ingen DOM eller lagring. Använder fortfarande hela dokumentkopior.
+- `project-storage.js`: serialisering, återläsning, debounce, avbrytning och
+  omedelbar sparning. Lagringsåtkomst injiceras. UI ansvarar för felmeddelanden.
+  Omedelbar sparning avbryter väntande sparning, även vid blockredigering/pagehide.
+- `file-import.js`: filstorleksgräns, val av parser, workerlivscykel, timeout,
+  felhantering och validering. Returnerar data/rapport, ändrar aldrig aktiv ritning.
+- `dxf-import.js` och DWG/DXF-workers: formatläsning och mappning till objekt.
+- `dxf-export.js`: DXF-serialisering, tillsammans med dxf-dimensions/dxf-layout.
+- `core.js`: kvarvarande geometri, dokumentvalidering och exempeldata.
+  Återexporterar History/toDXF för kompatibilitet. Nya anrop importerar direkt
+  från ansvarig modul. Det finns fortfarande cykliska beroenden kring core;
+  de ska lösas när rena geometrioperationer och objekttyper separeras.
+
+## Fortsatt arbete
+
+1. Separera dokumentmodell/validering och rena geometriprimitiver från core.
+2. Flytta verktygens tillstånd och kommandofaser från app till testbara kommandon.
+3. Separera rendering, hit-test och inspector från kommandona.
+4. Mät stora dokument innan spatialt index, cache och förändringsbaserad historik.
+5. Byt lagringsadapter till IndexedDB med migrering och återställningspunkter.
+
+Undvik samtidig omskrivning av filformat, verktygsbeteende och rendering.
+Testa tjänster utan webbläsare med injicerad lagring/worker och behåll
+geometri-, export-, block- och PWA-tester som regressionsskydd.
+
+Kontroll: `npm run build && npm run check`. Byggsteget tar automatiskt med
+nya src-moduler i release och offlinecache.
