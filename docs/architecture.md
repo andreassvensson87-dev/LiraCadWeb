@@ -47,3 +47,21 @@ nya src-moduler i release och offlinecache.
 Appen äger fortfarande scenrendering, overlays, kommandotillstånd och valet av
 objektspecifika inspectorfält. Nästa etapp kan flytta hela kommandon ett i taget;
 modulerna ovan ska inte få tillbaka beroenden på appens globala tillstånd.
+
+## Tredje etappen: editor och verktygsprotokoll
+
+`editor.js` samordnar registrerade verktyg. `drawing-tools.js` implementerar
+LINE, CIRCLE och ARC med `create`, `handle`, `preview`, `describe`.
+Verktygen tar punkt/text-händelser och returnerar nästa tillstånd, valfri
+geometriändring och meddelande. De känner inte till DOM, lagring eller dokument.
+Editorn skickar ändringen genom en injicerad applyChange-adapter till befintlig
+make/commit/History. Den adaptern tilldelar aktuellt lager, färg, linjetyp och
+model/paperspace. Förhandsvisningar ändrar aldrig dokumentet.
+Kommandoraden får sin prompt via editorn. `describe.properties` deklarerar
+verktygets generella egenskaper; inspectorn använder fortfarande sina gemensamma
+befintliga fält. Markeringsverktyg och övriga kommandon ligger kvar i app.js
+under migreringen. Editorn äger ännu inte hela dokumentet/kamera/markering.
+
+Escape avbryter via editor.cancel. Enter/mellanslag skickas som textinmatning
+från samma befintliga tangentbordsadapter. LINE avslutas med tom inmatning,
+CIRCLE/ARC avslutas vid färdig geometri. Felaktig båge behåller tidigare punkter.

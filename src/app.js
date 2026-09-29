@@ -1,3 +1,5 @@
+import { Editor } from "./editor.js";
+import { drawingTools } from "./drawing-tools.js";
 import { createEntityRenderer } from "./entity-renderer.js";
 import { commandPrompt, advancedNames } from "./command-prompts.js";
 import { createInspectorControls } from "./inspector-controls.js";
@@ -283,6 +285,18 @@ const { field, section, choice, action, colorFields } = createInspectorControls(
     },
   },
 );
+const editor = new Editor({
+  tools: drawingTools,
+  applyChange: (change) =>
+    addEntities(
+      change.entities.map(({ type, ...props }) => make(type, props)),
+      change.label,
+    ),
+  notify: log,
+  onState: (state) => {
+    tool = state;
+  },
+});
 function log(s) {
   const el = document.createElement("div");
   el.textContent = s;
@@ -1405,6 +1419,8 @@ function render() {
   $("#zoom-level").textContent = `${Math.round(camera.scale * 1000)}%`;
 }
 function previewEntities() {
+  if (editor.owns(tool))
+    return editor.preview(cursor).map((e) => ({ ...e, layer: activeLayer }));
   if (!tool || tool.phase === "select" || tool.phase === "text") return [];
   const extra = advancedPreview();
   if (extra) return extra;
@@ -1412,8 +1428,6 @@ function previewEntities() {
     q = cursor,
     n = tool.name,
     layer = activeLayer;
-  if (n === "LINE" && p.length)
-    return [{ type: "line", points: [p.at(-1), q], layer }];
   if (n === "INSERT" && tool.template && tool.phase === "points")
     return [insertBlock(tool.template, q, layer, drawingSpace())];
   if (n === "PLINE" && p.length) {
@@ -1442,14 +1456,6 @@ function previewEntities() {
     return [
       { type: "polyline", points: rectangle(p[0], q), closed: true, layer },
     ];
-  if (n === "CIRCLE" && p.length)
-    return [{ type: "circle", center: p[0], radius: dist(p[0], q), layer }];
-  if (n === "ARC" && p.length === 2) {
-    const a = arcThrough(p[0], p[1], q);
-    return a ? [{ type: "arc", ...a, layer }] : [];
-  }
-  if (n === "ARC" && p.length === 1)
-    return [{ type: "line", points: [p[0], q], layer }];
   if (n === "LEADER" && p.length)
     return [
       { type: "leader", points: [...p, q], text: "", height: 120, layer },
@@ -1477,7 +1483,9 @@ function prompt() {
     snap = null;
     $("#snap-feedback").textContent = "";
   }
-  const s = commandPrompt(tool, { cornerSize, chamferSize });
+  const s = editor.owns(tool)
+    ? editor.describe().prompt
+    : commandPrompt(tool, { cornerSize, chamferSize });
   $("#command-label").textContent = tool ? tool.name : "Kommando";
   input.placeholder = s || "Skriv ett kommando…";
   $("#status-mode").textContent = tool
@@ -1495,6 +1503,7 @@ function prompt() {
   schedule();
 }
 function cancel(clear = true) {
+  editor.cancel();
   canvas.style.cursor = "crosshair";
   clearTracking();
   tool = null;
@@ -1642,6 +1651,8 @@ function start(name) {
     }
     selection.clear();
   }
+  if (editor.supports(name)) editor.start(name);
+  else editor.cancel();
   log(`${name} · ${tool.phase === "select" ? "Välj objekt." : "Startat."}`);
   prompt();
   renderInspector();
@@ -1721,6 +1732,11 @@ function finishTransform(target, value) {
   log(`${n} · ${ids.length} objekt.`);
 }
 function acceptPoint(p) {
+  if (editor.owns(tool)) {
+    editor.dispatch({ type: "point", point: p });
+    prompt();
+    return;
+  }
   if (!tool) return;
   const n = tool.name,
     ps = tool.points;
@@ -1766,12 +1782,6 @@ function acceptPoint(p) {
       );
       return;
     }
-  } else if (n === "LINE") {
-    if (ps.length) {
-      if (dist(ps.at(-1), p) < 1e-8) return;
-      addEntities([make("line", { points: [ps.at(-1), p] })], "Linje");
-    }
-    ps.push(p);
   } else if (n === "PLINE" || n === "HATCH") {
     if (n === "PLINE" && ps.length && tool.arcMode) {
       if (!tool.arcMid) {
@@ -1797,25 +1807,6 @@ function acceptPoint(p) {
         [make("polyline", { points: rectangle(ps[0], p), closed: true })],
         "Rektangel",
       );
-      tool = null;
-    }
-  } else if (n === "CIRCLE") {
-    if (!ps.length) ps.push(p);
-    else {
-      const r = dist(ps[0], p);
-      if (r < 1e-8) return;
-      addEntities([make("circle", { center: ps[0], radius: r })], "Cirkel");
-      tool = null;
-    }
-  } else if (n === "ARC") {
-    if (ps.length < 2) ps.push(p);
-    else {
-      const a = arcThrough(ps[0], ps[1], p);
-      if (!a) {
-        log("Punkterna ligger på en rät linje. Välj en annan slutpunkt.");
-        return;
-      }
-      addEntities([make("arc", a)], "Båge");
       tool = null;
     }
   } else if (n === "TEXT") {
@@ -1886,6 +1877,11 @@ function submit(value) {
   if (!tool) {
     if (s) start(s);
     else start(lastCommand);
+    return;
+  }
+  if (editor.owns(tool)) {
+    editor.dispatch({ type: "text", text: s, cursor });
+    prompt();
     return;
   }
   if (tool.name === "BLOCK" && tool.phase === "select") {
@@ -2071,17 +2067,6 @@ function submit(value) {
     }
     finishTransform(cursor, tool.name === "ROTATE" ? (n * Math.PI) / 180 : n);
     return;
-  }
-  if (tool.name === "CIRCLE" && tool.points.length) {
-    const n = number(s);
-    if (n !== null) {
-      if (n <= 0) {
-        log("Radien måste vara positiv.");
-        return;
-      }
-      acceptPoint(add(tool.points[0], { x: n, y: 0 }));
-      return;
-    }
   }
   if (["PLINE", "HATCH"].includes(tool.name) && s.toUpperCase() === "C") {
     if (tool.points.length < 3) {
