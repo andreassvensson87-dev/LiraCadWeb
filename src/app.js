@@ -1,3 +1,4 @@
+import { initializeLiraShell } from "./lira-shell.js";
 import { Editor } from "./editor.js";
 import { drawingTools } from "./drawing-tools.js";
 import { createEntityRenderer } from "./entity-renderer.js";
@@ -3638,3 +3639,12 @@ setupPWA(() => {
   syncViewport();
   projectStorage.save(doc);
 });
+
+initializeLiraShell();
+
+for (const [id, factor] of [["#zoom-out", 1 / 1.25], ["#zoom-in", 1.25]]) {
+  $(id).onclick = () => {
+    camera.scale = Math.max(0.000001, Math.min(10000, camera.scale * factor));
+    schedule();
+  };
+}

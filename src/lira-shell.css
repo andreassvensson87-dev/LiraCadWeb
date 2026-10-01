@@ -1,0 +1,591 @@
+/* Shared visual dimensions for the Lira family. */
+body[data-lira-app] > header {
+  height: 54px;
+  min-height: 54px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 0 18px;
+  gap: 12px;
+  background: #192f35;
+  color: #eef5f2;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+body[data-lira-app] > header .brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 0 0;
+  flex-shrink: 0;
+}
+body[data-lira-app] > header .brand img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+body[data-lira-app] > header .brand strong {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  color: #eef5f2;
+}
+body[data-lira-app] > header .brand strong span {
+  font-size: inherit;
+  font-weight: 400;
+  color: #a5cabd;
+  margin: 0;
+  letter-spacing: inherit;
+}
+body[data-lira-app] > header .brand > span {
+  display: none;
+}
+body[data-lira-app] > header button {
+  font-size: 11px;
+  min-height: 30px;
+  border-radius: 5px;
+}
+body[data-lira-app] > header .history {
+  display: flex;
+  gap: 5px;
+}
+body[data-lira-app] > header .history button {
+  padding: 5px 8px;
+}
+body[data-lira-app] > header .history svg {
+  width: 18px;
+  height: 18px;
+}
+body[data-lira-app] .lira-rail,
+body[data-lira-app="structure"] .workspace > .toolbox {
+  position: absolute;
+  z-index: 12;
+  top: 20px;
+  left: 16px;
+  width: 70px;
+  height: auto;
+  max-height: calc(100% - 110px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid #d5dfe1;
+  border-radius: 12px;
+  background: #ffffffed;
+  box-shadow: 0 3px 14px #172b3208;
+  backdrop-filter: blur(8px);
+}
+body[data-lira-app] .lira-rail > div {
+  display: contents;
+}
+body[data-lira-app] .lira-rail button,
+body[data-lira-app="structure"] .toolbox button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 58px;
+  min-height: 56px;
+  padding: 8px 3px;
+  margin: 0;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #647a83;
+  font:
+    400 11px/1.2 Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  box-shadow: none;
+}
+body[data-lira-app] .lira-rail button:hover {
+  background: #edf3f3;
+  color: #263f49;
+}
+body[data-lira-app] .lira-rail button.lira-open,
+body[data-lira-app] .lira-rail button[data-tool="select"].active,
+body[data-lira-app] .lira-rail button[data-command="SELECT"].active,
+body[data-lira-app="structure"] .toolbox button.active {
+  background: #203c45;
+  color: #f6fbfa;
+}
+body[data-lira-app] .lira-rail svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+body[data-lira-app] .lira-tool-panel {
+  position: absolute;
+  z-index: 13;
+  left: 96px;
+  top: 20px;
+  width: 270px;
+  height: auto;
+  max-width: calc(100% - 112px);
+  max-height: calc(100% - 110px);
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 5px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #d5dfe1;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px #172b321a;
+}
+body[data-lira-app] .lira-tool-panel[hidden] {
+  display: none;
+}
+body[data-lira-app] .lira-tool-panel #tools,
+body[data-lira-app] .lira-tool-panel .tool-group {
+  display: contents;
+}
+body[data-lira-app] .lira-tool-panel .tool-group[hidden] {
+  display: none;
+}
+body[data-lira-app] .lira-tool-panel button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 78px;
+  min-height: 60px;
+  height: auto;
+  padding: 8px 4px;
+  gap: 5px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 11px;
+  white-space: normal;
+  background: transparent;
+}
+body[data-lira-app] .lira-tool-panel button[hidden] {
+  display: none;
+}
+body[data-lira-app] .lira-tool-panel button:hover {
+  background: #edf3f3;
+}
+body[data-lira-app] .lira-tool-panel button.active {
+  background: #203c45;
+  color: white;
+}
+body[data-lira-app] .lira-view {
+  position: absolute;
+  z-index: 10;
+  right: 16px;
+  bottom: 52px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 5px;
+  border: 1px solid #d5dfe1;
+  border-radius: 8px;
+  background: #fffffff0;
+}
+body[data-lira-app] .lira-view button {
+  height: 30px;
+  min-height: 30px;
+  width: auto;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+.lira-more {
+  position: relative;
+  font-size: 12px;
+}
+.lira-more summary {
+  cursor: pointer;
+  padding: 7px;
+}
+.lira-more .history-buttons {
+  position: absolute;
+  top: 35px;
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 190px;
+  padding: 8px;
+  background: white;
+  color: #293d40;
+  border: 1px solid #d5dfe1;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px #172b3220;
+}
+.lira-more .history-buttons button {
+  text-align: left;
+  color: #293d40;
+}
+@media (max-height: 650px) {
+  body[data-lira-app] .lira-rail button,
+  body[data-lira-app="structure"] .toolbox button {
+    min-height: 42px;
+    gap: 3px;
+    padding: 4px;
+  }
+}
+
+body[data-lira-app] .lira-properties {
+  position: absolute;
+  right: 16px;
+  top: 20px;
+  z-index: 11;
+}
+body[data-lira-app] .lira-properties > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 9px 12px;
+  border: 1px solid #d5dfe1;
+  border-radius: 8px;
+  background: #fffffff0;
+  font-size: 11px;
+}
+body[data-lira-app] .lira-properties[open] > summary {
+  background: #203c45;
+  color: white;
+}
+body[data-lira-app] .lira-properties .properties {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  width: 300px;
+  height: auto;
+  max-height: calc(100dvh - 240px);
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d5dfe1;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 5px 20px #172b321a;
+}
+body[data-lira-app] .lira-properties .properties > div {
+  flex-wrap: wrap;
+  max-width: 100%;
+  gap: 8px;
+}
+body[data-lira-app] .lira-properties .properties #selectionHint {
+  white-space: normal;
+}
+@media (max-width: 1000px) {
+  body[data-lira-app] > header {
+    gap: 7px;
+    padding: 0 12px;
+  }
+  body[data-lira-app] > header .document-name {
+    min-width: 0;
+  }
+  body[data-lira-app] > header .saved {
+    display: none;
+  }
+  body[data-lira-app] > header .file-actions {
+    gap: 4px;
+  }
+  body[data-lira-app] > header .file-actions button {
+    padding: 6px;
+  }
+}
+
+/* Anchor floating controls to the drawing area, not the document body. */
+body[data-lira-app] main > .workspace {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Shared footer navigation, beside snap controls. */
+body[data-lira-app] .lira-footer-view {
+  position: static;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 3px;
+  margin: 0 6px 0 0;
+  padding: 0 7px 0 0;
+  border: 0;
+  border-right: 1px solid #d5dfe1;
+  background: transparent;
+  box-shadow: none;
+}
+body[data-lira-app] .lira-footer-view button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: 26px;
+  min-height: 26px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  background: transparent;
+  color: inherit;
+}
+body[data-lira-app] .lira-footer-view button:hover {
+  background: #e5eeea;
+}
+body[data-lira-app] .lira-footer-view .tool-icon {
+  display: none;
+}
+body[data-lira-app] .lira-footer-view #zoom,
+body[data-lira-app] .lira-footer-view #zoom-level {
+  min-width: 40px;
+  text-align: center;
+  font-size: 10px;
+}
+body[data-lira-app] > footer {
+  overflow-x: auto;
+  flex-shrink: 0;
+  min-height: 34px;
+}
+body[data-lira-app] > footer > div {
+  flex-shrink: 0;
+}
+body[data-lira-app="pdf"] main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+body[data-lira-app="pdf"] #pagePanel {
+  grid-column: 1/-1;
+  grid-row: 1;
+}
+body[data-lira-app="pdf"] main > .workspace {
+  grid-column: 1;
+  grid-row: 2;
+}
+body[data-lira-app="pdf"] .lira-inspector {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  background: #fcfdfc;
+  border-left: 1px solid #d4dfd9;
+}
+body[data-lira-app="pdf"] .inspector-header {
+  padding: 24px 21px 18px;
+}
+body[data-lira-app="pdf"] .inspector-header h1 {
+  margin: 5px 0 0;
+  font-size: 19px;
+  font-weight: 550;
+  letter-spacing: -0.5px;
+}
+body[data-lira-app="pdf"] .lira-inspector .properties {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  padding: 0 21px 24px;
+  height: auto;
+  border: 0;
+  background: transparent;
+}
+body[data-lira-app="pdf"] .lira-inspector .properties > div {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+body[data-lira-app="pdf"] .lira-inspector .properties [hidden] {
+  display: none;
+}
+body[data-lira-app="pdf"] .lira-inspector .properties label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+body[data-lira-app="pdf"]
+  .lira-inspector
+  .properties
+  input:not([type="checkbox"]):not([type="color"]) {
+  margin-left: auto;
+  width: 115px;
+  min-width: 0;
+}
+body[data-lira-app="pdf"] .lira-inspector #viewportName {
+  width: 100%;
+}
+body[data-lira-app="pdf"] .lira-inspector #selectionHint {
+  white-space: normal;
+  line-height: 1.5;
+}
+body[data-lira-app="pdf"] .lira-inspector .scale {
+  margin: 0;
+  padding: 16px 0 0;
+  border-top: 1px solid #e1e7e5;
+}
+
+/* Inspector yields to the full-width command panel below main. */
+body[data-lira-app] .inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+body[data-lira-app] .lira-inspector-toggle {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #d5dfe1;
+  border-radius: 5px;
+  background: #fff;
+  color: #466459;
+  font-size: 22px;
+  cursor: pointer;
+}
+body[data-lira-app] .lira-inspector-toggle:hover {
+  background: #edf3ef;
+}
+body[data-lira-app].lira-inspector-collapsed main {
+  grid-template-columns: minmax(0, 1fr);
+}
+body[data-lira-app] main > aside[hidden] {
+  display: none;
+}
+body[data-lira-app] .workspace > .lira-inspector-toggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 14;
+  box-shadow: 0 2px 8px #172b3214;
+}
+body[data-lira-app="pdf"] .lira-command-panel {
+  position: relative;
+  flex-shrink: 0;
+  border-top: 1px solid #d7e0db;
+  background: #fff;
+  padding: 8px 21px 0;
+}
+body[data-lira-app="pdf"] #lira-command-log {
+  height: 32px;
+  overflow-y: auto;
+  color: #8a998e;
+  font:
+    10px/16px "IBM Plex Mono",
+    monospace;
+  scrollbar-width: thin;
+}
+body[data-lira-app="pdf"] #lira-command-log > :last-child {
+  color: #5b7464;
+}
+body[data-lira-app="pdf"] .lira-command-panel .command {
+  border: 0;
+  padding: 0;
+  height: 39px;
+  gap: 10px;
+}
+body[data-lira-app="pdf"] .lira-command-panel .command > span {
+  font:
+    26px "IBM Plex Mono",
+    monospace;
+  color: #208b67;
+}
+body[data-lira-app="pdf"] .lira-command-panel label {
+  font:
+    11px "IBM Plex Mono",
+    monospace;
+  color: #398163;
+}
+body[data-lira-app="pdf"] .lira-command-panel input {
+  width: auto;
+  min-width: 0;
+  flex: 1;
+  color: #315e46;
+  font:
+    12px "IBM Plex Mono",
+    monospace;
+  padding: 8px 0;
+}
+body[data-lira-app="pdf"] .lira-command-panel input::placeholder {
+  color: #9aa79d;
+}
+body[data-lira-app="pdf"] .lira-command-panel #prompt {
+  flex: 0 1 auto;
+  max-width: 45%;
+  font-size: 9px;
+}
+
+body[data-lira-app].lira-inspector-collapsed main {
+  grid-template-columns: minmax(0, 1fr) 42px;
+}
+body[data-lira-app].lira-inspector-collapsed main > aside:not(.page-strip) {
+  display: flex;
+  overflow: hidden;
+}
+body[data-lira-app].lira-inspector-collapsed .inspector-header {
+  padding: 10px 6px;
+  flex-direction: column-reverse;
+  gap: 18px;
+}
+body[data-lira-app].lira-inspector-collapsed .inspector-header h1 {
+  writing-mode: vertical-rl;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  margin: 0;
+}
+body[data-lira-app].lira-inspector-collapsed .selection-badge {
+  display: none;
+}
+
+body[data-lira-app] button.lira-update {
+  background: #74d9b0;
+  color: #153a2e;
+  border: 1px solid #74d9b0;
+  font-weight: 600;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+body[data-lira-app] button.lira-update[hidden] {
+  display: none;
+}
+
+body[data-lira-app] main > aside > [hidden] {
+  display: none;
+}
+
+/* Keep the inspector toggle anchored at identical coordinates in both states. */
+body[data-lira-app] main > aside:not(.page-strip) > .inspector-header {
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+  min-height: 56px;
+  padding-right: 44px;
+  background: #fcfdfc;
+  z-index: 1;
+}
+body[data-lira-app] .inspector-header > .lira-inspector-toggle {
+  position: absolute;
+  top: 10px;
+  right: 6px;
+  margin: 0;
+}
+body[data-lira-app].lira-inspector-collapsed
+  main
+  > aside:not(.page-strip)
+  > .inspector-header {
+  padding: 56px 6px 12px;
+  flex-direction: column;
+}

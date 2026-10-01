@@ -1,10 +1,9 @@
+import { watchAppUpdate } from "./update-ui.js";
 export function setupPWA(saveBeforeUpdate) {
   const install = document.querySelector("#install-app");
   const update = document.querySelector("#update-app");
   const status = document.querySelector("#pwa-status");
-  let installPrompt,
-    registration,
-    approved = false;
+  let installPrompt;
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     installPrompt = event;
@@ -27,42 +26,10 @@ export function setupPWA(saveBeforeUpdate) {
     location.pathname === "/"
   )
     return;
-  const showUpdate = () => {
-    update.hidden = !registration?.waiting;
-  };
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (approved) location.reload();
-  });
-  navigator.serviceWorker.addEventListener("message", (event) => {
-    if (event.data?.type === "UPDATE_BLOCKED") {
-      approved = false;
-      update.disabled = false;
-      status.textContent = "Stäng andra LiraCAD-fönster och försök igen.";
-    }
-  });
-  update.onclick = async () => {
-    try {
-      const message = saveBeforeUpdate();
-      if (message) { status.textContent = message; return; }
-      approved = true;
-      update.disabled = true;
-      registration.waiting?.postMessage({ type: "ACTIVATE_UPDATE" });
-    } catch {
-      approved = false;
-      update.disabled = false;
-      status.textContent =
-        "Kunde inte spara lokalt. Spara projekt till fil innan uppdatering.";
-    }
-  };
   navigator.serviceWorker
     .register("./sw.js", { updateViaCache: "none" })
     .then((reg) => {
-      registration = reg;
-      showUpdate();
-      reg.addEventListener("updatefound", () => {
-        reg.installing?.addEventListener("statechange", showUpdate);
-      });
-      window.addEventListener("focus", () => reg.update().catch(() => {}));
+      watchAppUpdate(reg, update, status, saveBeforeUpdate);
     })
     .catch(() => {
       status.textContent = "Offlinefunktion är inte tillgänglig.";
