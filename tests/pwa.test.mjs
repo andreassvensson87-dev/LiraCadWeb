@@ -9,6 +9,12 @@ test("release contains noindex and all precached files exist",async()=>{
  assert.ok(!html.includes('href="/'));
  const manifest=JSON.parse(await readFile("dist/manifest.webmanifest","utf8"));
  assert.equal(manifest.scope,"./");
+  // Manifest id resolves against the origin, unlike start_url and scope.
+  const origin = 'https://andreassvensson87-dev.github.io';
+  const manifestUrl = origin + '/LiraCadWeb/manifest.webmanifest';
+  assert.equal(new URL(manifest.id, origin).href, origin + '/LiraCadWeb/');
+  assert.equal(new URL(manifest.start_url, manifestUrl).href, origin + '/LiraCadWeb/');
+  assert.equal(new URL(manifest.scope, manifestUrl).href, origin + '/LiraCadWeb/');
  assert.equal(manifest.display,"standalone");
  for(const icon of manifest.icons) assert.ok((await readFile("dist/"+icon.src)).length>100);
  const worker=await readFile("dist/sw.js","utf8");
