@@ -232,7 +232,7 @@ let activeLayer = doc.layers[0].id,
   drag = null,
   space = false,
   spaceUsed = false,
-  showGrid = false,
+  showGrid = true,
   osnap = true,
   ortho = false,
   polarEnabled = true,
@@ -1286,12 +1286,23 @@ function render() {
     tl = world({ x: 0, y: 0 }),
     br = world({ x: width, y: height });
   if (showGrid) {
-    ctx.fillStyle = "#2e474a";
-    for (let x = Math.ceil(tl.x / step) * step; x < br.x; x += step)
-      for (let y = Math.ceil(br.y / step) * step; y < tl.y; y += step) {
-        const p = screen({ x, y });
-        ctx.fillRect(p.x, p.y, 1, 1);
-      }
+    ctx.save();
+    ctx.strokeStyle = activeSpace === "model" ? "#3b535b" : "#aab5bc";
+    ctx.lineWidth = 0.6;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    for (let x = Math.ceil(tl.x / step) * step; x < br.x; x += step) {
+      const p = screen({ x, y: 0 });
+      ctx.moveTo(p.x, 0);
+      ctx.lineTo(p.x, height);
+    }
+    for (let y = Math.ceil(br.y / step) * step; y < tl.y; y += step) {
+      const p = screen({ x: 0, y });
+      ctx.moveTo(0, p.y);
+      ctx.lineTo(width, p.y);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
   if (activeSpace === "model") paintEntities("model");
   else paintLayout();
@@ -3368,9 +3379,12 @@ document.addEventListener("click", (ev) => {
   if (b) start(b.dataset.command);
 });
 $("#fit-view").onclick = fit;
+$("#toggle-grid").classList.toggle("active", showGrid);
+$("#toggle-grid").setAttribute("aria-pressed", String(showGrid));
 $("#toggle-grid").onclick = () => {
   showGrid = !showGrid;
   $("#toggle-grid").classList.toggle("active", showGrid);
+  $("#toggle-grid").setAttribute("aria-pressed", String(showGrid));
   schedule();
 };
 $("#snap-toggle").onclick = () => toggle("snap");
