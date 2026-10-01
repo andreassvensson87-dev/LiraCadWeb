@@ -10,6 +10,7 @@ const types = {
   ".json": "application/json",
   ".webmanifest": "application/manifest+json",
   ".png": "image/png",
+  ".svg": "image/svg+xml",
   ".wasm": "application/wasm",
 };
 http
