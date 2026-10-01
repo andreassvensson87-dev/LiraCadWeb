@@ -62,6 +62,20 @@ self.addEventListener("fetch", event => {
  if(event.request.method !== "GET") return;
  const url = new URL(event.request.url);
  if(!url.href.startsWith(self.registration.scope)) return;
+  // Installation metadata must not be pinned to an older offline release.
+  const manifestUrl = new URL('manifest.webmanifest', self.registration.scope);
+  if (url.pathname === manifestUrl.pathname) {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(event.request, { cache: 'no-store' });
+        if (response.ok) return response;
+      } catch {}
+      const cached = await (await caches.open(CACHE)).match(manifestUrl.href);
+      return cached || Response.error();
+    })());
+    return;
+  }
+
  const target = event.request.mode === "navigate"
    ? new URL("index.html",self.registration.scope).href : url.href;
  if(!urls.includes(target)) return;
