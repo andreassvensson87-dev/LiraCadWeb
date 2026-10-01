@@ -32,7 +32,7 @@ async function vendorFiles(dir, prefix = "vendor") {
 }
 const dwgFiles = await vendorFiles(path.join(root, "src/vendor"));
 sourceFiles.push(...dwgFiles);
-const shared = ["manifest.webmanifest", "icon-192.png", "icon-512.png"];
+const shared = ["manifest.webmanifest", "lira-icon.svg", "favicon-32.png", "apple-touch-icon.png", "icon-192.png", "icon-512.png"];
 for (const file of shared)
   await copyFile(path.join(root, file), path.join(out, file));
 const html = await readFile(path.join(root, "index.html"), "utf8");

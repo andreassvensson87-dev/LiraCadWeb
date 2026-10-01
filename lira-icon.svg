@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="LiraCAD"><title>LiraCAD</title><defs><linearGradient id="face" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1aa18a"/><stop offset="1" stop-color="#0e826e"/></linearGradient></defs><path fill="url(#face)" fill-rule="evenodd" d="M55 14h18l43 85-11 15H23L12 99Zm9 32L38 90h52Z"/>
+    <path fill="#08705f" d="m73 14 43 85-11 15-15-24-26-44Z"/>
+    <path fill="#0b7967" d="M23 114 38 90h52l15 24Z"/>
+    <path fill="#1a9c84" d="M55 14h18l-9 32-26 44-26 9Z"/>
+    <path fill="#106c5d" d="m12 99 26-9-15 24Z"/></svg>

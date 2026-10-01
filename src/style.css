@@ -83,15 +83,11 @@ button.primary:hover {
   align-items: center;
 }
 .brand-mark {
-  width: 28px;
-  height: 30px;
-  border-radius: 5px;
-  background: #76dfb5;
-  color: #193d31;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 23px;
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 .brand strong {
   font-size: 21px;
