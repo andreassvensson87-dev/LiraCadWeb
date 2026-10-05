@@ -1,19 +1,15 @@
 import { blockParts } from "./blocks.js";
 import { polylineParts, hasBulges } from "./polyline.js";
-import {
-  dist,
-  sub,
-  add,
-  mul,
-  polar,
-  angle,
-  onArc,
-  snapPoints,
-  segments,
-  intersection,
-} from "./core.js";
+import { dist, sub, add, mul, polar, angle, onArc, intersection } from "./geometry.js";
+import { snapPoints, segments } from "./entity-geometry.js";
+import { createSpatialIndex } from "./spatial-index.js";
 const cross = (a, b) => a.x * b.y - a.y * b.x;
 const dot = (a, b) => a.x * b.x + a.y * b.y;
+const edgePadding = e => 1e-8 + Math.max(e.maxX-e.minX,e.maxY-e.minY)*1e-9;
+const paddedEdge = e => {
+  const pad=edgePadding(e);
+  return {minX:e.minX-pad,maxX:e.maxX+pad,minY:e.minY-pad,maxY:e.maxY+pad};
+};
 const pointOn = (shape, p) =>
   shape.type !== "arc" || onArc(shape, angle(shape.center, p));
 function lineCircle(a, b, circle) {
@@ -50,13 +46,13 @@ function circles(a, b) {
     n = { x: -v.y * h, y: v.x * h };
   return [add(p, n), sub(p, n)].filter((p) => pointOn(a, p) && pointOn(b, p));
 }
-export function createSnapIndex(entities) {
+export function collectSnapGeometry(entities) {
   const points = [],
     edges = [];
   for (const e of entities) {
     points.push(...snapPoints(e).map((p) => ({ ...p, id: e.id })));
     if (e.type === "block" || hasBulges(e)) {
-      const nested = createSnapIndex(
+      const nested = collectSnapGeometry(
         e.type === "block" ? blockParts(e) : polylineParts(e),
       );
       edges.push(...nested.edges.map((edge) => ({ ...edge, id: e.id })));
@@ -85,19 +81,71 @@ export function createSnapIndex(entities) {
   }
   return { points, edges };
 }
+export function createSnapIndex(entities) {
+  const geometry=new WeakMap(),points=[],edges=[];
+  for(const entity of entities) {
+    const group=collectSnapGeometry([entity]);geometry.set(entity,group);
+    points.push(...group.points);edges.push(...group.edges);
+  }
+  edges.forEach((edge,i)=>edge.order=i);
+  return { points, edges, geometry,
+    pointIndex: createSpatialIndex(points, s => ({minX:s.p.x,maxX:s.p.x,minY:s.p.y,maxY:s.p.y})),
+    edgeIndex: createSpatialIndex(edges, paddedEdge),
+    edgeOrder: {get:edge=>edge.order},nativeOrder:true,
+  };
+}
+export function appendSnapIndex(index, entities) {
+  const geometry=index.geometry,points=[],edges=[];
+  for(const entity of entities) {
+    const group=collectSnapGeometry([entity]);geometry.set(entity,group);
+    points.push(...group.points);edges.push(...group.edges);
+  }
+  edges.forEach((edge,i)=>edge.order=index.edges.length+i);
+  const allEdges=[...index.edges,...edges];
+  return {points:[...index.points,...points],edges:allEdges,geometry,
+    pointIndex:index.pointIndex.append(points),edgeIndex:index.edgeIndex.append(edges),
+    nativeOrder:index.nativeOrder,edgeOrder:index.nativeOrder?index.edgeOrder:new Map(allEdges.map((edge,i)=>[edge,i]))};
+}
+// Accepted entities are immutable: reuse their snap geometry and update tree
+// branches only for actual replacements. Reassemble arrays in document order.
+export function updateSnapIndex(index, entities) {
+  if(!index.geometry)return createSnapIndex(entities);
+  const geometry=index.geometry,points=[],edges=[];
+  for(const entity of entities) {
+    let group=index.geometry.get(entity);
+    if(!group){
+      group=collectSnapGeometry([entity]);
+      group.edges.forEach((edge,i)=>edge.order=edges.length+i);
+    }
+    geometry.set(entity,group);points.push(...group.points);edges.push(...group.edges);
+  }
+  const nativeOrder=edges.every((edge,i)=>edge.order===i);
+  return {geometry,points,edges,pointIndex:index.pointIndex.update(points),edgeIndex:index.edgeIndex.update(edges),
+    nativeOrder,edgeOrder:nativeOrder?{get:edge=>edge.order}:new Map(edges.map((edge,i)=>[edge,i]))};
+}
 export function nearbySnaps(index, p, tolerance) {
-  const candidates = index.points.filter((s) => dist(s.p, p) <= tolerance);
-  const edges = index.edges.filter(
+  if(index.nearby)return index.nearby(p,tolerance);
+  const box = {minX:p.x-tolerance,maxX:p.x+tolerance,minY:p.y-tolerance,maxY:p.y+tolerance};
+  const candidates = (index.pointIndex?.query(box, true) || index.points).filter((s) => dist(s.p, p) <= tolerance);
+  const edges = (index.edgeIndex?.query(box, true) || index.edges).filter(
     (e) =>
       p.x >= e.minX - tolerance &&
       p.x <= e.maxX + tolerance &&
       p.y >= e.minY - tolerance &&
       p.y <= e.maxY + tolerance,
   );
-  for (let i = 0; i < edges.length; i++)
-    for (let j = i + 1; j < edges.length; j++) {
-      const a = edges[i],
-        b = edges[j];
+  for (let i = 0; i < edges.length; i++) {
+    const a = edges[i];
+    // At overview scales the cursor covers thousands of edges. Only compare
+    // pairs whose bounding boxes overlap, instead of every nearby edge pair.
+    const padded = paddedEdge(a);
+    const others = edges.length > 64 && index.edgeIndex && index.edgeOrder
+      ? index.edgeIndex.query({minX:Math.max(padded.minX,box.minX),maxX:Math.min(padded.maxX,box.maxX),minY:Math.max(padded.minY,box.minY),maxY:Math.min(padded.maxY,box.maxY)},true)
+        .filter(b=>index.edgeOrder.get(b)>index.edgeOrder.get(a))
+      : edges.slice(i+1);
+    for (const b of others) {
+      const pad=edgePadding(a)+edgePadding(b);
+      if (a.maxX+pad < b.minX || a.minX-pad > b.maxX || a.maxY+pad < b.minY || a.minY-pad > b.maxY) continue;
       let hits = [];
       if (a.type === "segment" && b.type === "segment") {
         const q = intersection(a.a, a.b, b.a, b.b);
@@ -109,6 +157,7 @@ export function nearbySnaps(index, p, tolerance) {
         if (dist(q, p) <= tolerance)
           candidates.push({ p: q, kind: "Skärning", id: a.id });
     }
+  }
   return candidates;
 }
 export function resolveSnap({
@@ -129,9 +178,12 @@ export function resolveSnap({
     : null;
   const allowed = (p) =>
     !ortho || !base || Math.abs(cross(sub(p, base), axis)) < 1e-7;
-  const exact = candidates
-    .filter((s) => allowed(s.p))
-    .sort((a, b) => dist(raw, a.p) - dist(raw, b.p))[0];
+  let exact, nearest = Infinity;
+  for (const candidate of candidates) {
+    if (!allowed(candidate.p)) continue;
+    const distance = dist(raw,candidate.p);
+    if (distance < nearest) { exact = candidate; nearest = distance; }
+  }
   if (exact) return { ...exact, mode: "object", guides: [] };
   const rays = [];
   if (track)

@@ -14,6 +14,8 @@ På den här datorn finns också `Starta LiraCAD.command`, som använder Codex m
 
 ## Prova
 
+- Öppna **Inställningar** i toppraden för att generera en exempelritning eller ett stresstest med 1 000, 10 000 eller 100 000 objekt. Välj blandade objekt eller enbart linjer. Genereringen ersätter ritningen och kan återställas med `U`/Ångra under samma session. Där finns också valet av navigeringsenhet.
+- För reproducerbara utvecklarprov, öppna `/tests/performance/` på den lokala servern. Se [mätresultat och kvarvarande begränsningar](docs/performance.md).
 - Exempelritningen innehåller alla objekttyper. Klicka för att markera eller dra en markeringsruta. Shift lägger till/tar bort ur markeringen.
 - Skriv `L`, Enter, `0,0`, Enter, `1000,0`, Enter, Enter. En linje skapas med exakt längd.
 - Markera linjen, skriv `M`, Enter, välj baspunkt och målpunkt. `@500,0` anger en relativ förflyttning.
@@ -45,25 +47,25 @@ Flytta, kopiera, rotera, skala och spegla fungerar för flerval. Spegla ersätte
 ## Filer
 
 - **Spara projekt** laddar ned en `.liracad`-fil; **Öppna projekt** läser tillbaka den.
-- Dokumentet autosparas i webbläsaren. Spara till fil för en separat säkerhetskopia. Ångrahistoriken bevaras under sessionen, inte efter omladdning.
+- Dokumentet autosparas i webbläsarens IndexedDB. Befintliga lokala utkast migreras automatiskt och tas bort ur den äldre lagringen först när flytten har sparats. Toppraden visar när sparningen är klar eller har misslyckats. Spara till fil för en separat säkerhetskopia. Ångrahistoriken bevaras under sessionen, inte efter omladdning.
 - **Exportera DXF** skriver DXF R2007 (UTF-8) med millimeter, lager/färger och native LINE, LWPOLYLINE, CIRCLE, ARC, TEXT, MTEXT, LEADER och HATCH. Leaderns text skrivs som separat TEXT/MTEXT, utan associativ koppling.
 - **DWG- och ASCII DXF-import finns i en första version.** Se importstöd och begränsningar nedan.
 - Ny ritning, exempelritning och öppnat projekt går att ångra under samma session.
 
 ## Teknik och begränsningar
 
-Modulär JavaScript utan byggberoenden. Geometri och DXF finns i `src/core.js`, interaktion/rendering i `src/app.js`. Denna första utgåva använder Canvas 2D och omritning vid ändringar via requestAnimationFrame. Stora produktionsritningar är ännu inte prestandaverifierade; nästa rendering/indexering väljs efter mätningar. Historiken sparar dokumentkopior, begränsade till 80 transaktioner, och behöver effektiviseras för stora filer.
+Modulär JavaScript utan byggberoenden. Ren geometri, objektoperationer, dokumentvalidering, transaktioner, kommandon, presentation och filformat har egna moduler. `src/core.js` är en kompatibilitetsfasad. `src/app.js` kopplar ihop modulerna och innehåller ännu viss interaktion/UI. Se [arkitekturen](docs/architecture.md) för ansvar och regler för vidareutveckling. Denna första utgåva använder Canvas 2D och omritning vid ändringar via requestAnimationFrame. Stora produktionsritningar är ännu inte prestandaverifierade; nästa rendering/indexering väljs efter mätningar. Historiken sparar dokumentkopior, begränsade till 80 transaktioner, och behöver effektiviseras för stora filer.
 
-Desktop med mus/tangentbord är målplattform. Hatch är en enkel polygon med parallella linjer; hål och komplexa mönster saknas. Textmått i markering är approximativa. Specialfonter, DWG-block och 3D ingår inte. Måttobjekt och paperspace finns nu, med begränsningar nedan. Systemfonter används om de valfria webbfonderna inte kan laddas.
+Desktop med mus/tangentbord är målplattform. Hatch är en enkel polygon med parallella linjer; hål och komplexa mönster saknas. Textmått i markering är approximativa. Specialfonter, dynamiska block och 3D ingår inte. Måttobjekt och paperspace finns nu, med begränsningar nedan. Systemfonter används om de valfria webbfonderna inte kan laddas.
 
 ## Kontroll
 
 ```sh
-npm test
+npm run build
 npm run check
 ```
 
-Geometritester täcker koordinater, bågar vid stora koordinater, transformationer, offset, markering, historik och projektvalidering. Under utvecklingen verifierades kommandoflöden och egenskapsredigering i webbläsaren. Exempelritningens DXF lästes med ezdxf: 47 entiteter, korrekt millimeterenhet, inga auditfel eller reparationer. Detta är ingen full kompatibilitetscertifiering mot AutoCAD.
+Kontrollen syntaxgranskar alla egna moduler, workers och skript. Arkitekturtester förhindrar cirkulära beroenden; transaktionstester verifierar validering, återställning och historik. Geometritester täcker koordinater, bågar vid stora koordinater, transformationer, offset, markering, historik och projektvalidering. Under utvecklingen verifierades kommandoflöden och egenskapsredigering i webbläsaren. Exempelritningens DXF lästes med ezdxf: 47 entiteter, korrekt millimeterenhet, inga auditfel eller reparationer. Detta är ingen full kompatibilitetscertifiering mot AutoCAD.
 
 Ritytan har inga fasta överlägg. Rutnät är avstängt som standard och kan väljas i verktygsfältet. Kommandovägledning och snapstatus visas vid kommandoraden; objekträknaren finns i inspectorn. Tillfälliga grips, snapmarkörer, förhandsvisningar och hjälplinjer visas bara under arbete.
 
@@ -84,7 +86,7 @@ Enkel oformaterad rad exporteras som TEXT. Flerradig eller formaterad text expor
 - `F`: välj två linjer före start, ange radie. Alternativt starta, ange radie och välj två linjer på sidorna som ska behållas. Radie 0 ger skarpt hörn. Förhandsvisning vid val av andra linjen.
 - `CHA`: motsvarande fasning. Ett avstånd ger lika sidor; `100,200` ger olika avstånd. För stora mått och parallella linjer avvisas.
 
-Polylinjer med bågsegment/bulges och Fillet/Chamfer direkt på polylinjehörn ingår ännu inte. Dela upp en rak polylinje med X för att använda hörnverktygen på linjerna.
+Polylinjer med bågsegment/bulges stöds; se beskrivningen nedan. Fillet/Chamfer direkt på polylinjehörn ingår ännu inte. Dela upp en polylinje med X för att använda hörnverktygen på dess raka linjer.
 
 ## Måttsättning
 
@@ -158,7 +160,7 @@ Webbläsarens lagring kan rensas och ersätter inte projektbackuper.
 ## Block, attribut och bågpolylinjer
 
 - **BLOCK / B:** markera objekt, ange ett unikt blocknamn och välj baspunkt. **INSERT / I:** ange blocknamnet och välj insättningspunkt. Knappar finns under Redigera. Definitionerna bevaras i projektet även om sista instansen raderas. Kopiera, flytta, rotera, skala, spegla, snap och insättningsgrepp fungerar. **X / EXPLODE** delar upp blocket igen.
-- **ATTDEF / ATT:** markera en enkelradig text och ange ett attributnamn (A–Z, 0–9, _). Ta med texten när blocket skapas. Varje infogat block har egna värden som ändras i inspektorn. Nya instanser får definitionens standardvärden. Nästlade/dynamiska block, BEDIT och multiline-attribut ingår inte i denna första version.
+- **ATTDEF / ATT:** markera en enkelradig text och ange ett attributnamn (A–Z, 0–9, _). Ta med texten när blocket skapas. Varje infogat block har egna värden som ändras i inspektorn. Nya instanser får definitionens standardvärden. BEDIT finns; se blockeditorn nedan. Nästlade/dynamiska block och multiline-attribut ingår inte i denna första version.
 - **PL / PLINE:** välj startpunkt och fortsätt med raka segment. **A** växlar till båge via en mellanpunkt och en slutpunkt. **L** återgår till linje, **U** ångrar senaste segment/mellanpunkt, **C** sluter med en rak kant och Enter avslutar. Bågens mittgrepp ändrar krökningen. JOIN kan sammanfoga linjer, bågar och öppna polylinjer; EXPLODE ger tillbaka linjer och bågar. Bågsegment lagras som DXF-bulge, inte som korta raka linjer.
 - OFFSET, TRIM/EXTEND och lägg till/ta bort hörn stöder ännu inte bågpolylinjer som redigeringsmål; kommandot säger till. Dela upp med X först. Bågpolylinjer fungerar som trimgränser.
 - DXF-export skriver BLOCK/INSERT, ATTDEF/ATTRIB, LWPOLYLINE med bulge och riktiga DIMENSION-objekt med DIMSTYLE och anonyma visningsblock. Måttkedjor blir separata redigerbara delmått i DXF. Måtten är ännu inte associativt kopplade till den måttsatta geometrin. Export har kontrollerats med ezdxf; öppning/regenerering i AutoCAD behöver också provas med riktiga filer.
@@ -231,3 +233,7 @@ objekttyper är inte verifierade. Testad i webbläsaren med ACadSharps
 `sample_AC1032.dwg` (111 inlästa objekt, rapporterade avvikelser).
 Runtimefilerna är cirka 27 MB och ingår i PWA-cachen för användning offline.
 Licenser och bygginstruktioner: `tools/DwgBridge/README.md`.
+
+### Stabilitetskontroll
+
+Se [stabilitetskontrollen](docs/stability.md) för verifierat filflöde och kvarvarande begränsningar. DXF återimporterar hänvisning och dess text som separata objekt; projektfiler bevarar kopplingen.

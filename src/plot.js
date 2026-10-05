@@ -2,7 +2,8 @@ import { linePattern } from "./linetypes.js";
 import { blockParts } from "./blocks.js";
 import { polylineParts, hasBulges } from "./polyline.js";
 import { dimensionParts } from "./dimensions.js";
-import { pointsOf, polar, angle } from "./core.js";
+import { pointsOf } from "./entity-geometry.js";
+import { polar, angle } from "./geometry.js";
 import { spaceOf } from "./layout.js";
 const escape = (s) =>
   String(s).replace(

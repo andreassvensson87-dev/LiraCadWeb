@@ -2,7 +2,41 @@
 
 Plan 2026-09-28, baserad på källkod i LiraCAD och LiraStructureWeb.
 
-Status: första interaktiva utgåvan 0.1 är byggd. Den innehåller kommandorad, inspector, lager, grundobjekt, transformationer, offset för linje/cirkel, historik, lokal projektlagring och DXF-export. Se README.md för exakt omfattning. Prototypen använder JavaScript och Canvas 2D utan byggberoenden för att snabbt kunna utvärdera känslan. DWG/DXF-import, GPU-rendering, stora ritningars prestanda och resterande produktionsfunktioner återstår; etapperna nedan beskriver fortsatt målbild.
+Status uppdaterad 2026-10-03: första interaktiva utgåvan 0.1 är byggd och har utökats med lokal DWG/DXF-import, blockeditor och attributfält, bågpolylinjer, måttkedjor, trim/förläng samt layouter och viewports. Se README.md för exakt omfattning och filbegränsningar. Appen använder JavaScript och Canvas 2D utan byggberoenden. GPU-rendering, stora ritningars prestanda och verifiering med representativa användarritningar återstår; etapperna nedan beskriver fortsatt målbild och är inte en lista över enbart återstående funktioner.
+
+### Aktuell kodgrund
+
+Den stabila kodgrunden är huvudfokus enligt avgränsningen 2026-10-02.
+Kärnan har separata moduler för ren geometri, objektoperationer, dokumentvalidering
+och exempeldata. De egna modulernas beroendegraf är acyklisk och testad.
+`DocumentSession` validerar isolerade utkast före historik/autosparning och
+bevarar dokument/redo vid fel. Lagerpanel, kommandokatalog och ikoner är separerade.
+Se `docs/architecture.md` för modulansvar och regler för vidareutveckling. LINE, CIRCLE, ARC,
+RECTANG, PLINE, MOVE, COPY, ROTATE, SCALE och MIRROR använder nu editorns testbara verktygsprotokoll. PLINE behåller
+bågsegment, A/L/U/C och en historikpost för hela det färdiga objektet.
+Alla transformationskommandon stöder förval och kommando-först med en historikpost för hela urvalet.
+OFFSET, TRIM och EXTEND ligger också i editorn: objektval, faser och preview är
+separerade från UI, med transaktionssäker uppdatering av markering och gräns-ID.
+FILLET/CHAMFER och PINSERT/PDELETE använder också verktygsprotokollet.
+Hörnoperationer sparar hela resultatet atomiskt och editorn äger accepterade standardmått.
+JOIN/EXPLODE ligger i editorn med atomisk ersättning av hela urvalet. Inspectorns
+gemensamma egenskaper, utseende, attribut och objektfält är separata moduler.
+Layout-/blockeditorpanelerna är separerade. Scenrenderaren äger Canvas-målning
+och viewportklippning med egen kamerakontext utan att ändra appens kamera.
+Alla måttkommandon ligger nu i editorn. `BlockEditSession` äger det isolerade
+blockutkastet och behåller det öppet vid sparfel. BLOCK/INSERT/ATTDEF och MVIEW
+använder också verktygsprotokollet. Texteditorns utkast och UI har separata ägare,
+med bevarat utkast vid sparfel. TEXT/LEADER/HATCH och DIST/PAN/ERASE är också
+separerade. Appskalet använder nu gemensam dispatch och preview för kommandona;
+arkitekturtesterna kontrollerar att varje interaktivt katalogkommando har en
+unik verktygsägare. DIST har åter fungerande mätning med avstånd och ΔX/ΔY.
+En samlad stabilitetskontroll av filflödet är genomförd; se
+`docs/stability.md`. Filoperationer har en testbar ägare och skydd för textutkast
+och ändringar under asynkron import.
+Bygg vidare inom dessa modulgränser och mät stora dokument innan rumsligt index
+eller ny rendering införs.
+Verifiera också DWG → redigering → DXF med riktiga ritningar och en oberoende
+CAD-läsare; dagens importstöd är avgränsat.
 
 ## Mål och första avgränsning
 
@@ -82,13 +116,20 @@ Första demonstrationen: skriv `L`, ange två punkter, avsluta, markera linjen, 
 
 ## DWG-beslut
 
-Prioritera ett avgränsat importprov med acadrust för lokal DWG-inläsning via WebAssembly. ACadSharp är ett alternativ om en separat importtjänst blir lämpligare. Biblioteksvalet är preliminärt tills verkliga filer har provats; ingen implementation är ännu verifierad.
+Implementerat första importflöde: ACadSharp 3.8.0 körs lokalt i .NET 10
+WebAssembly i en separat worker. En DXF-representation skapas i minnet och
+går genom samma importör som DXF-filer. Inga ritningar skickas till en server.
+ACadSharps `sample_AC1032.dwg` har provats i webbläsaren; bredare verifiering
+med verkliga ritningar återstår. Se README.md och `tools/DwgBridge/README.md`.
 
 Vi behöver DWG-läsning och DXF-skrivning. Direkt import till objektmodellen och konvertering via DXF är båda tillåtna vägar. Välj efter objekttrohet, laddningstid, licens och integrationsarbete. ODA/RealDWG är reservspår om de öppna alternativen inte klarar nödvändiga ritningar. Ingen uppladdning av användarfiler till en tjänst införs implicit.
 
 En DWG-till-DXF-konvertering kan användas i ett avgränsat första importflöde, men är inte ett löfte om full objekttrohet eller förlustfri återexport. Visa per fil vad som är redigerbart, endast synligt eller saknar stöd. Behåll originalfilen och stoppa tyst dataförlust vid export. Att behålla okända rådata garanterar inte att referenser fortsatt är giltiga efter redigering.
 
-Återstående beslut: bibliotek och version, webbläsare kontra eventuell tjänst, DWG-versioner, DXF-målversion, objektlista och fontstrategi. Dessa blockerar inte första CAD-prototypen.
+Återstående beslut: verifierad stödmatris för DWG-versioner/objekt,
+DXF-målversion och fontstrategi. Läsaren stöder AC1014–AC1032, men alla versioner
+och objekttyper är inte verifierade. Bibliotek/version och lokal körning är
+fastställda för det första importflödet.
 
 Källor kontrollerade 2026-09-28:
 

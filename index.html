@@ -19,12 +19,13 @@
       <div class="document-name">
         <span class="live-dot"></span
         ><span id="document-name">Ateljé — studieplan</span
-        ><span class="saved" id="save-state">Lokalt utkast</span>
+        ><span class="saved" id="save-state" role="status" aria-live="polite">Lokalt utkast</span>
       </div>
       <div class="file-actions">
         <span id="pwa-status" role="status"></span>
         <button id="install-app" hidden>Installera app</button>
         <button id="update-app" hidden>Ny version – uppdatera</button>
+        <button id="settings-button">Inställningar</button>
         <button id="open-file">Öppna projekt</button
         ><button id="save-file">Spara projekt</button
         ><button class="primary" id="export-dxf">
@@ -167,6 +168,39 @@
         </div>
       </aside>
     </main>
+    <dialog id="settings-dialog" aria-labelledby="settings-title">
+      <button class="dialog-close" id="close-settings" aria-label="Stäng inställningar">×</button>
+      <h2 id="settings-title">Inställningar</h2>
+      <label class="settings-field">Navigering
+        <select id="settings-navigation">
+          <option value="trackpad">Styrplatta</option>
+          <option value="mouse">Mus</option>
+        </select>
+      </label>
+      <section class="settings-section">
+        <h3>Exempel och stresstest</h3>
+        <p>Generera en ny ritning för att prova verktygen eller testa prestandan.
+          Den öppna ritningen ersätts och kan återställas med Ångra.</p>
+        <button id="generate-example">Generera exempelritning</button>
+        <label class="settings-field">Antal objekt
+          <select id="stress-count">
+            <option value="1000">1 000</option>
+            <option value="10000">10 000</option>
+            <option value="100000">100 000</option>
+          </select>
+        </label>
+        <label class="settings-field">Objekt i stresstestet
+          <select id="stress-pattern">
+            <option value="mixed">Blandade objekt</option>
+            <option value="lines">Enbart linjer</option>
+          </select>
+        </label>
+        <p>Blandade objekt innehåller linjer, cirklar, bågar, polylinjer och text.
+          Prova zoom, markering, snappning och sparande i den genererade ritningen.</p>
+        <button class="primary" id="generate-stress">Generera stresstest</button>
+        <p id="generation-status" role="status" aria-live="polite"></p>
+      </section>
+    </dialog>
     <dialog id="import-dialog" aria-label="Importresultat">
       <h2>DXF-import</h2>
       <p id="import-summary"></p>

@@ -12,12 +12,11 @@ import {
   angle,
   polar,
   mod,
-  clone,
-  uid,
   segmentDistance,
   inside,
   intersection,
-} from "./core.js";
+} from "./geometry.js";
+import { clone, uid } from "./values.js";
 const cross = (a, b) => a.x * b.y - a.y * b.x;
 export function infiniteIntersection(a, b, c, d) {
   const v = sub(b, a),
@@ -152,6 +151,7 @@ export function joinEntities(entities, tolerance = 1e-6) {
     id: uid(),
     layer: entities[0].layer,
     color: entities[0].color,
+    lineType: entities[0].lineType,
     space: entities[0].space,
     type: "polyline",
     closed,

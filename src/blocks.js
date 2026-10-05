@@ -1,4 +1,6 @@
-import { clone, transform, sub, add, uid } from "./core.js";
+import { clone, uid } from "./values.js";
+import { transform } from "./entity-transform.js";
+import { sub, add } from "./geometry.js";
 export const validBlockName = (s) =>
   typeof s === "string" && /^[\p{L}\p{N}_-]{1,64}$/u.test(s);
 export const validTag = (s) =>

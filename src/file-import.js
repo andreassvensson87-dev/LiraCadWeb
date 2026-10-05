@@ -1,4 +1,4 @@
-import { validDocument } from "./core.js";
+import { validDocument } from "./document.js";
 
 // Returns data only: replacing the current drawing and showing reports belong to UI.
 export async function readDrawingFile(file, options = {}) {

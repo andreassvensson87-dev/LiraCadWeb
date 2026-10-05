@@ -1,4 +1,4 @@
-import { number } from "./core.js";
+import { number } from "./geometry.js";
 // Reusable controls emit callbacks; document mutations belong to their caller.
 export function createInspectorControls({ document, onInvalid }) {
   function field(label, value, change, type = "number") {
@@ -23,8 +23,13 @@ export function createInspectorControls({ document, onInvalid }) {
         onInvalid("Ogiltigt värde.");
         return;
       }
-      accepted = el.value;
-      change(v);
+      try {
+        change(v);
+        accepted = el.value;
+      } catch (error) {
+        el.value = accepted;
+        onInvalid(error.message || "Ändringen kunde inte sparas.");
+      }
     };
     el.onchange = apply;
     el.onblur = apply;

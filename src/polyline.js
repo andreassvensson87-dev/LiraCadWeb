@@ -1,4 +1,4 @@
-import { add, sub, mul, dist, angle, polar } from "./core.js";
+import { add, sub, mul, dist, angle, polar } from "./geometry.js";
 export const hasBulges = (e) =>
   e.type === "polyline" && (e.bulges || []).some((b) => Math.abs(b) > 1e-12);
 export function polylineParts(e) {

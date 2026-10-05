@@ -1,5 +1,8 @@
 import { aciColors } from "./dxf-colors.js";
-import { uid, validDocument, transform, sub, add, mul } from "./core.js";
+import { uid } from "./values.js";
+import { validDocument } from "./document.js";
+import { transform } from "./entity-transform.js";
+import { sub, add, mul } from "./geometry.js";
 import { blockParts, validBlockName, validTag } from "./blocks.js";
 import { lineTypes, validLineType } from "./linetypes.js";
 const get = (r, c, f = "") => r.find((p) => p[0] === c)?.[1] ?? f;

@@ -1,4 +1,4 @@
-import { dist } from "./core.js";
+import { dist } from "./geometry.js";
 const same = (a, b) => a && b && dist(a, b) < 1e-7;
 export class TrackingReferences {
   constructor({ acquireMs = 400, releaseMs = 1200 } = {}) {

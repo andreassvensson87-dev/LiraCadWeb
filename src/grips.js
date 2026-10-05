@@ -1,5 +1,6 @@
 import { polylineParts, hasBulges } from "./polyline.js";
-import { clone, polar, dist, arcThrough } from "./core.js";
+import { clone } from "./values.js";
+import { polar, dist, arcThrough } from "./geometry.js";
 
 export function grips(e) {
   if (hasBulges(e))

@@ -1,18 +1,7 @@
 import { polylineParts, hasBulges } from "./polyline.js";
-import {
-  add,
-  sub,
-  mul,
-  dist,
-  angle,
-  polar,
-  mod,
-  onArc,
-  segments,
-  segmentDistance,
-  clone,
-  uid,
-} from "./core.js";
+import { add, sub, mul, dist, angle, polar, mod, onArc, segmentDistance } from "./geometry.js";
+import { segments } from "./entity-geometry.js";
+import { clone, uid } from "./values.js";
 const EPS = 1e-7,
   TAU = Math.PI * 2;
 const dot = (a, b) => a.x * b.x + a.y * b.y;

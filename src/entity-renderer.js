@@ -3,7 +3,8 @@ import { polylineParts, hasBulges } from "./polyline.js";
 import { dimensionParts } from "./dimensions.js";
 import { linePattern } from "./linetypes.js";
 import { textLines, textFont } from "./text.js";
-import { pointsOf, bounds, add, TAU } from "./core.js";
+import { pointsOf, bounds } from "./entity-geometry.js";
+import { add, TAU } from "./geometry.js";
 
 // Stateless entity painter. Camera/layers are resolved per draw, including viewports.
 export function createEntityRenderer({ ctx, screen, getCamera, layerOf }) {

@@ -1,4 +1,4 @@
-import { add, mod } from "./core.js";
+import { add, mod } from "./geometry.js";
 import { lineTypes } from "./linetypes.js";
 import {
   splitDimension,

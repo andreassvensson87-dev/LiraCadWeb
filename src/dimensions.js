@@ -1,4 +1,4 @@
-import { add, sub, mul, dist, angle, polar, mod } from "./core.js";
+import { add, sub, mul, dist, angle, polar, mod } from "./geometry.js";
 export function dimensionChain(source, measurements, placement, axis) {
   const u = axis || source.axis || { x: 1, y: 0 };
   const projection = (p) => p.x * u.x + p.y * u.y;

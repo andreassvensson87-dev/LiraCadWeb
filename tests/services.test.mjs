@@ -97,37 +97,37 @@ test("invalid imported document is rejected and project files need no worker", a
     /stor/,
   );
 });
-test("storage distinguishes missing, corrupt and inaccessible drafts", () => {
+test("storage distinguishes missing, corrupt and inaccessible drafts", async () => {
   let raw = null;
-  const storage = new ProjectStorage(() => ({ getItem: () => raw }));
-  assert.deepEqual(storage.restore(validDocument), {
+  const storage = new ProjectStorage({read:async()=>raw==null?undefined:JSON.parse(raw)});
+  assert.deepEqual(await storage.restore(validDocument), {
     document: null,
     error: false,
   });
   raw = "bad json";
-  assert.equal(storage.restore(validDocument).error, true);
+  assert.equal((await storage.restore(validDocument)).error, true);
   raw = "{}";
-  assert.equal(storage.restore(validDocument).error, true);
+  assert.equal((await storage.restore(validDocument)).error, true);
   raw = JSON.stringify(demoDocument());
-  assert.ok(storage.restore(validDocument).document);
+  assert.ok((await storage.restore(validDocument)).document);
   assert.equal(
-    new ProjectStorage(() => {
+    (await new ProjectStorage({read:async()=>{
       throw Error("Denied");
-    }).restore(validDocument).error,
+    }}).restore(validDocument)).error,
     true,
   );
 });
 test("immediate save cancels a pending block draft and debounce saves latest document", async () => {
   const writes = [];
   const storage = new ProjectStorage(
-    () => ({ setItem: (key, value) => writes.push(JSON.parse(value)) }),
+    {write:async document=>writes.push(structuredClone(document))},
     { delay: 5 },
   );
   storage.schedule(
     () => ({ name: "block draft" }),
     () => assert.fail("cancelled callback"),
   );
-  storage.save({ name: "main document" });
+  await storage.save({ name: "main document" });
   await new Promise((r) => setTimeout(r, 15));
   assert.deepEqual(writes, [{ name: "main document" }]);
   let current = { name: "earlier" };
@@ -140,18 +140,18 @@ test("immediate save cancels a pending block draft and debounce saves latest doc
 });
 test("storage reports quota failure to the caller", async () => {
   const storage = new ProjectStorage(
-    () => ({
-      setItem: () => {
+    {
+      write: async () => {
         throw Error("Quota");
       },
-    }),
+    },
     { delay: 0 },
   );
   const error = await new Promise((resolve) =>
     storage.schedule(() => ({}), resolve),
   );
   assert.equal(error.message, "Quota");
-  assert.throws(() => storage.save({}), /Quota/);
+  await assert.rejects(storage.save({}), /Quota/);
 });
 test("history snapshots are isolated and a new edit discards redo", () => {
   const history = new History();

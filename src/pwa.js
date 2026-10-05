@@ -21,8 +21,9 @@ export function setupPWA(saveBeforeUpdate) {
   });
   if (!("serviceWorker" in navigator)) return;
   // Keep the ordinary local development page free from release caching.
+  const host = location.hostname.replace(/\.$/, '');
   if (
-    ["127.0.0.1", "localhost"].includes(location.hostname) &&
+    (["127.0.0.1", "localhost"].includes(host) || host.endsWith('.localhost')) &&
     location.pathname === "/"
   )
     return;

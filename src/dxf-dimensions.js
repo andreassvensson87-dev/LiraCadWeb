@@ -1,5 +1,5 @@
 import { dimensionParts } from "./dimensions.js";
-import { add, sub, mul, dist, angle, polar } from "./core.js";
+import { add, sub, mul, dist, angle, polar } from "./geometry.js";
 export function splitDimension(e) {
   if (!e.chain) return [e];
   const points = e.points

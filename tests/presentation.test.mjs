@@ -161,3 +161,15 @@ test("inspector multiline Enter keeps editing; Ctrl Enter commits", () => {
   input.onkeydown({ key: "Enter", ctrlKey: true, preventDefault() {} });
   assert.deepEqual(changes, ["First\nSecond"]);
 });
+
+test("inspector keeps the accepted value when the document transaction rejects a change", () => {
+  const errors = [];
+  const { field } = createInspectorControls({ document, onInvalid: (m) => errors.push(m) });
+  const input = field("X", 10, () => { throw Error("Ogiltig ritning"); }).children[1];
+  input.value = "1000000000000000";
+  input.onchange();
+  assert.equal(input.value, "10");
+  assert.deepEqual(errors, ["Ogiltig ritning"]);
+  input.onblur();
+  assert.equal(errors.length, 1);
+});
