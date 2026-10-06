@@ -229,14 +229,23 @@ DXF-referenser: [INSERT](https://help.autodesk.com/cloudhelp/2021/ENU/AutoCAD-DX
 
 ### WBLOCK · separata mallfiler
 `WBLOCK` (`WB`) eller **Exportera mall · DXF** under Ändra skriver en separat
-DXF-fil. Källritningens objekt, blockdefinitioner och ångrahistorik behålls.
+DXF-fil via en dialog med källa, baspunkt, originalobjekt och sparplats.
 
-- **O / Enter: markerade objekt.** Markera först eller välj objekt i ritytan
-  och tryck Enter. Ange filnamn och välj en baspunkt genom klick eller
-  koordinater. Enter väljer 0,0. Baspunkten blir mallfilens origo.
-- **B: blockdefinition.** Ange ett befintligt blocknamn och filnamn.
-  Definitionens eget origo och grundgeometri används. Definitioner kan
-  exporteras även om inga instanser finns kvar i ritningen.
+- **Valda objekt:** använd markeringen eller klicka **Välj objekt i modellen**,
+  markera och tryck Enter för att återgå till dialogen.
+- **Baspunkt:** ange X/Y eller klicka **Välj baspunkt i modellen** och välj
+  punkten i ritytan med snäppning. Punkten blir mallfilens 0,0. Esc återgår
+  till dialogen; vid punktval behålls den tidigare baspunkten.
+- **Blockdefinition:** välj ett befintligt block i listan. Definitionens eget
+  origo används, även om inga instanser finns kvar. **Hela modellen** tar med
+  alla modellobjekt, utan layouter och viewport-ramar.
+- **Efter export:** behåll originalobjekten (standard), omvandla till ett
+  namngivet block eller ta bort dem. Ändringar sker först efter lyckad export
+  och går att ångra. Blockkonvertering stöder inte nästlade block.
+- **Fil och sparplats:** ange filnamn och välj mapp i den vanliga Spara som-rutan
+  i webbläsare med stöd för filväljaren, exempelvis Edge/Chrome på Windows.
+  Annars används webbläsarens nedladdningshantering. Avbrutet eller misslyckat
+  sparande lämnar dialogen öppen och originalobjekten orörda.
 
 Exporten innehåller bara valda objekt och deras nödvändiga lager, med lager 0
 som blockens fallback. Geometrin hamnar i modellutrymmet, enheten är millimeter

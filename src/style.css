@@ -832,6 +832,23 @@ dialog::backdrop {
   background: #0d2529aa;
   backdrop-filter: blur(4px);
 }
+#wblock-dialog { width: min(580px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 20px; }
+#wblock-dialog fieldset { border: 1px solid #d4e2d9; border-radius: 8px; margin: 8px 0; padding: 10px; }
+#wblock-dialog h2 { margin-bottom: 12px; }
+#wblock-dialog button { padding: 6px 10px; border: 1px solid #c7d8d0; border-radius: 5px; background: #f5f9f6; font-size: 12px; }
+#wblock-dialog button:disabled { opacity: .5; }
+#wblock-dialog legend { font-weight: 600; font-size: 13px; padding: 0 5px; }
+#wblock-dialog label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 13px; }
+#wblock-dialog label[hidden] { display: none; }
+#wblock-dialog input, #wblock-dialog select { min-width: 0; width: 240px; padding: 7px; border: 1px solid #c7d8d0; border-radius: 5px; background: white; color: inherit; }
+#wblock-dialog p { font-size: 12px; line-height: 1.5; margin: 6px 0 0; }
+.wblock-inline, .wblock-footer, .wblock-coordinates { display: flex; align-items: center; gap: 12px; }
+.wblock-coordinates label { flex: 1; min-width: 0; }
+.wblock-coordinates input { width: 100% !important; }
+.wblock-footer { justify-content: flex-end; }
+#wblock-dialog #wblock-save { background: #8bd6b5; }
+#wblock-status { min-height: 22px; color: #9c392f; }
+@media (max-width: 480px) { #wblock-dialog label { align-items: stretch; flex-direction: column; } #wblock-dialog input, #wblock-dialog select { width: 100%; } .wblock-inline { flex-wrap: wrap; } }
 #settings-dialog {
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);

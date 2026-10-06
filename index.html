@@ -188,6 +188,33 @@
         </div>
       </aside>
     </main>
+    <dialog id="wblock-dialog" aria-labelledby="wblock-title">
+      <form id="wblock-form">
+        <h2 id="wblock-title">WBLOCK · Exportera mall</h2>
+        <fieldset><legend>Källa</legend>
+          <label>Exportera <select id="wblock-source"><option value="objects">Valda objekt</option><option value="block">Blockdefinition</option><option value="drawing">Hela modellen</option></select></label>
+          <label>Block <select id="wblock-block" aria-label="Blockdefinition"></select></label>
+          <div class="wblock-inline"><button type="button" id="wblock-pick-objects">Välj objekt i modellen</button><span id="wblock-object-count"></span></div>
+        </fieldset>
+        <fieldset id="wblock-base-fields"><legend>Baspunkt · nytt origo</legend>
+          <div class="wblock-coordinates"><label>X <input id="wblock-x" type="number" step="any" required value="0"></label><label>Y <input id="wblock-y" type="number" step="any" required value="0"></label></div>
+          <button type="button" id="wblock-pick-base">Välj baspunkt i modellen</button>
+          <p>Vald punkt blir filens 0,0. Blockdefinitioner använder eget origo.</p>
+        </fieldset>
+        <fieldset><legend>Objekt i ritningen</legend>
+          <label>Efter export <select id="wblock-action"><option value="retain">Behåll objekten</option><option value="convert">Omvandla till block</option><option value="delete">Ta bort objekten</option></select></label>
+          <label id="wblock-block-name-row" hidden>Blocknamn <input id="wblock-block-name" maxlength="64"></label>
+        </fieldset>
+        <fieldset><legend>Fil och sparplats</legend>
+          <label>Filnamn <span class="wblock-inline"><input id="wblock-filename" required maxlength="124" value="Mall"><span>.dxf</span></span></label>
+          <button type="button" id="wblock-browse">Välj sparplats…</button>
+          <p id="wblock-destination"></p>
+          <p>Format: DXF · Insättningsenhet: millimeter</p>
+        </fieldset>
+        <p id="wblock-status" role="status" aria-live="polite"></p>
+        <div class="wblock-footer"><button type="button" id="wblock-cancel">Avbryt</button><button type="submit" id="wblock-save">Exportera</button></div>
+      </form>
+    </dialog>
     <dialog id="settings-dialog" aria-labelledby="settings-title">
       <button class="dialog-close" id="close-settings" aria-label="Stäng inställningar">×</button>
       <h2 id="settings-title">Inställningar</h2>

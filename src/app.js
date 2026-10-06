@@ -15,6 +15,7 @@ import { Editor } from "./editor.js";
 import { drawingTools } from "./drawing-tools.js";
 import { stretchTools } from "./stretch-tools.js";
 import { wblockTools } from "./wblock-tools.js";
+import { createWblockDialog } from "./wblock-dialog.js";
 import { beginSelectionGesture, moveSelectionGesture, releaseSelectionGesture } from "./selection-gesture.js";
 import { transformTools, applyTransformChange } from "./transform-tools.js";
 import { editingTools, applyEditingChange } from "./editing-tools.js";
@@ -44,6 +45,7 @@ import { ProjectStorage } from "./project-storage.js";
 import { ProjectWorkspace } from "./project-workspace.js";
 import {
   blockTemplates,
+  createBlock,
   blockParts,
   withAttributeText,
 } from "./blocks.js";
@@ -66,7 +68,7 @@ import {createLocalSnapIndex} from './local-snapping.js';
 import { createSpatialIndex } from "./spatial-index.js";
 import { IndexedDBProjectStore } from './indexeddb-project-store.js';
 import { wheelNavigation, commandSubmitKey } from "./navigation.js";
-import { TAU, dist, add, sub, mul, angle, polar, number } from "./geometry.js";
+import { TAU, dist, add, sub, mul, angle, polar, number, parsePoint } from "./geometry.js";
 import { clone, uid } from "./values.js";
 import { pointsOf, bounds, drawingBounds, hitDistance, rectSelect } from "./entity-geometry.js";
 import { transformed } from "./entity-transform.js";
@@ -784,6 +786,7 @@ function prompt() {
   schedule();
 }
 function cancel(clear = true) {
+  wblockDialog.dismiss();
   editor.cancel();
   canvas.style.cursor = "crosshair";
   clearTracking();
@@ -801,6 +804,7 @@ function start(name) {
   if (textEditor.active && !finishTextEdit(true)) return;
   name = aliases[name.toUpperCase()] || name.toUpperCase();
   if (["MT", "MTEXT"].includes(name)) name = "TEXT";
+  if (name !== 'WBLOCK') wblockDialog.dismiss();
   if (["BEDIT", "BE"].includes(name)) {
     beginBlockEdit(selectedEntities()[0]);
     return;
@@ -819,7 +823,7 @@ function start(name) {
     return;
   }
   if(name==='WBLOCK'){
-    clearTracking();tool={name};editor.start(name);lastCommand=name;input.value='';$("#suggestions").hidden=true;log("WBLOCK · Exportera mall som DXF.");prompt();update();return;
+    cancel(false);lastCommand=name;wblockDialog.open();return;
   }
   if (name === "MODEL") {
     switchSpace("model");
@@ -968,12 +972,24 @@ function dispatchEditor(event) {
   }
 }
 function acceptPoint(p) {
+  if (wblockDialog.picking === 'base') { wblockDialog.resume(p); return; }
   if (!editor.owns(tool)) return;
   dispatchEditor({ type: "point", point: p });
   prompt();
 }
 function submit(value) {
   const text = value.trim();
+  if (wblockDialog.picking) {
+    input.value='';
+    if (wblockDialog.picking === 'objects') {
+      if (!text) wblockDialog.resume();
+      else log('Markera objekten och tryck Enter för att återgå till WBLOCK.');
+    } else {
+      const point=text?parsePoint(text,null,cursor):{x:0,y:0};
+      if(point)wblockDialog.resume(point);else log('Ange en baspunkt, t.ex. 100,200.');
+    }
+    return;
+  }
   if (text) {
     commandHistory.push(text);
     historyCursor = commandHistory.length;
@@ -1459,10 +1475,11 @@ document.addEventListener("keydown", (ev) => {
   const editing = ev.target.matches(
     "input,select,textarea,[contenteditable=true]",
   );
-  if ($("#help-dialog").open || $("#settings-dialog").open || textEditor.active) return;
+  if ($("#help-dialog").open || $("#settings-dialog").open || $("#wblock-dialog").open || textEditor.active) return;
   if (ev.isComposing) return;
   if (ev.key === "Escape") {
     ev.preventDefault();
+    if (wblockDialog.picking) { wblockDialog.resume(); return; }
     if (editing && ev.target !== input) ev.target.blur();
     cancel();
     return;
@@ -1665,6 +1682,30 @@ function download(name, text, type) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+const wblockDialog = createWblockDialog({
+  document, getDocument:()=>doc, getSelected:selectedEntities, download, notify:log,
+  pickFile:typeof window.showSaveFilePicker==='function' ? name=>window.showSaveFilePicker({suggestedName:name,types:[{description:'DXF-ritning',accept:{'application/dxf':['.dxf']}}]}) : null,
+  beginPick:kind=>{
+    editor.cancel();drag=null;clearTracking();
+    tool={name:'WBLOCK',phase:kind==='objects'?'select':'dialogBase',points:[]};
+    log(kind==='objects'?'WBLOCK · Markera objekt och tryck Enter.':'WBLOCK · Klicka på baspunkten eller ange X,Y. Esc återgår till dialogen.');
+    update();
+  },
+  endPick:()=>{editor.cancel();tool=null;drag=null;clearTracking();snap=null;prompt();update();},
+  prepareChange:(request,action,blockName)=>{
+    if(action==='retain')return null;
+    const sources=doc.entities.filter(e=>request.entityIds.includes(e.id));
+    if(sources.some(e=>!editableIds.has(e.id)))throw Error('Originalobjekten måste vara synliga och olåsta för att ändras efter export.');
+    if(action==='delete')return ()=>replaceEntities('WBLOCK · Ta bort exporterade objekt',doc.entities.filter(e=>!request.entityIds.includes(e.id)));
+    if(blockTemplates(doc).some(b=>b.definition.name.toLowerCase()===blockName.trim().toLowerCase()))throw Error('Blocknamnet används redan.');
+    if(new Set(sources.map(spaceOf)).size!==1)throw Error('Välj objekt i samma modell eller layout för att skapa ett block.');
+    const block=createBlock(sources,blockName.trim(),request.base,sources[0].layer,spaceOf(sources[0]));
+    const change={kind:'editing',label:'WBLOCK · Omvandla till block',replaceIds:request.entityIds,entities:[block],definitions:[block.definition]};
+    if(!validDocument({...doc,entities:applyEditingChange(doc.entities,change),blocks:[...(doc.blocks||[]),block.definition]}))throw Error('Objekten kunde inte omvandlas till ett giltigt block.');
+    return ()=>{applyObjectChange(change);selection=new Set([block.id]);update();};
+  },
+});
 
 function beginBlockEdit(entity) {
   if(entity?._annotationSource){entity=doc.entities.find(e=>e.id===entity.id)||entity;log("Blockeditorn redigerar den gemensamma grunddefinitionen för alla skalor. Textutseende på ett attribut ändrar den aktiva skalvarianten.");}
