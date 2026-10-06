@@ -637,6 +637,8 @@ function addEntities(es, label) {
     catch(error){log('Tillfällig sparlogg kunde inte uppdateras: '+error.message);}
   }
   if (!activeViewportId && indexedDocument===previous && indexedSpace===drawingSpace()) {
+    // Keep rectangle selection, properties and grips in sync with the indexes.
+    interactionEntities=interactionEntities.concat(added);
     sceneIndex=sceneIndex.append(added);
     snapCache.append(added,sceneIndex);
     for(const entity of added)if(editable(entity))editableIds.add(entity.id);
