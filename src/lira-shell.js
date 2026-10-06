@@ -3,6 +3,7 @@ const paths = {
   select: "m5 3 14 10-7 1-3 7Z",
   draw: "m4 17 12-12 3 3-12 12-4 1Z M14 7l3 3",
   edit: "M5 5h14v14H5Z M3 3h4v4H3Z M17 17h4v4h-4Z",
+  block: "M4 4h12v12H4Z M9 9h12v12H9Z",
   pdf: "M6 3h8l4 4v14H6Z M14 3v5h5 M9 12h6M9 16h6",
   measure: "M3 7v10M21 7v10M3 12h18M7 9l-4 3 4 3m10-6 4 3-4 3",
   layout: "M3 4h18v16H3Z M7 8h10v8H7Z",
@@ -38,12 +39,7 @@ export function initializeLiraShell() {
           ["pdf", "PDF"],
           ["measure", "Mått"],
         ]
-      : [
-          ["draw", "Rita"],
-          ["edit", "Ändra"],
-          ["measure", "Mått"],
-          ["layout", "Layout"],
-        ];
+      : {draw:["draw","Rita"],edit:["edit","Ändra"],block:["block","Block"],dimension:["measure","Mått"],layout:["layout","Layout"]};
   const close = () => {
     ribbon.hidden = true;
     categories.forEach((b) => {
@@ -52,7 +48,7 @@ export function initializeLiraShell() {
     });
   };
   categories.forEach((b, i) => {
-    decorate(b, ...config[i]);
+    decorate(b, ...(kind==='pdf'?config[i]:config[b.dataset.ribbon]));
     b.setAttribute("aria-controls", ribbon.id);
     b.setAttribute("aria-expanded", "false");
     b.addEventListener("click", () => {

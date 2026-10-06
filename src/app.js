@@ -9,6 +9,7 @@ import { createAttributeInspector } from "./attribute-inspector.js";
 import { createEntityInspector } from "./entity-inspector.js";
 import { definitions, aliases, transforms } from "./command-catalog.js";
 import { icons } from "./toolbar-icons.js";
+import { toolbarGroups, toolbarLabels } from "./toolbar-groups.js";
 import { createLayerPanel } from "./layer-panel.js";
 import { initializeLiraShell } from "./lira-shell.js";
 import { Editor } from "./editor.js";
@@ -90,20 +91,20 @@ $("#navigation-device").addEventListener("change", () => {
 const canvas = $("#canvas"),
   ctx = canvas.getContext("2d"),
   input = $("#command-input");
-for (const [i, [name, label, a]] of definitions
-  .filter((d) => d[0] !== "MVIEW")
-  .entries()) {
-  const b = document.createElement("button");
-  b.dataset.command = name;
-  b.title = `${label} · ${a}`;
-  b.innerHTML = `<span class="tool-icon"><svg viewBox="0 0 24 24">${icons[name]}</svg></span><span>${label}</span>`;
-  $(
-    i < 8
-      ? "#draw-tools"
-      : name.startsWith("DIM")
-        ? "#dimension-buttons"
-        : "#edit-tools",
-  ).append(b);
+for (const [category, groups] of Object.entries(toolbarGroups)) {
+  const panel=$(`[data-tool-panel="${category}"]`);
+  for (const {label:heading,commands} of groups) {
+    const section=document.createElement('section');section.className='toolbar-section';
+    section.setAttribute('aria-label',heading);
+    const title=document.createElement('h3');title.textContent=heading;section.append(title);
+    for (const name of commands) {
+      const [,label,alias]=definitions.find(d=>d[0]===name);
+      const b=document.createElement('button');b.dataset.command=name;b.title=`${label} · ${alias}`;
+      b.innerHTML=`<span class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg></span><span>${toolbarLabels[name]||label}</span>`;
+      section.append(b);
+    }
+    panel.append(section);
+  }
 }
 let blockEditor = null;
 let parameterEdit = null;

@@ -218,7 +218,8 @@ Windows Utforskarens riktiga standardappsval måste verifieras på Windows.
 
 ## Block, attribut och bågpolylinjer
 
-- **BLOCK / B:** markera objekt, ange ett unikt blocknamn och välj baspunkt. **INSERT / I:** ange blocknamnet och välj insättningspunkt. Knappar finns under Redigera. Definitionerna bevaras i projektet även om sista instansen raderas. Kopiera, flytta, rotera, skala, spegla, snap och insättningsgrepp fungerar. **X / EXPLODE** delar upp blocket igen.
+- Blockverktygen finns i kategorin **Block**, med grupperna **Skapa & infoga**, **Redigera block** och **Exportera**. Rita, Ändra och Mått har också underrubriker och knappar med ikon och text.
+- **BLOCK / B:** markera objekt, ange ett unikt blocknamn och välj baspunkt. **INSERT / I:** ange blocknamnet och välj insättningspunkt. Knappar finns under Block. Definitionerna bevaras i projektet även om sista instansen raderas. Kopiera, flytta, rotera, skala, spegla, snap och insättningsgrepp fungerar. **X / EXPLODE** delar upp blocket igen.
 - Markerade block har dessutom ett flyttgrepp vid geometrins mitt, så även importerade block med en avlägsen insättningspunkt kan flyttas med grepp i vyn. Greppet flyttar hela instansen; definition och stretchvärden behålls.
 - **ATTDEF / ATT:** markera en enkelradig text och ange ett attributnamn (A–Z, 0–9, _). Ta med texten när blocket skapas. Varje infogat block har egna värden som ändras i inspektorn. Nya instanser får definitionens standardvärden. BEDIT finns; se blockeditorn nedan. Nästlade block, AutoCADs dynamiska blockfunktioner och multiline-attribut ingår inte i denna första version.
 - **PL / PLINE:** välj startpunkt och fortsätt med raka segment. **A** växlar till båge via en mellanpunkt och en slutpunkt. **L** återgår till linje, **U** ångrar senaste segment/mellanpunkt, **C** sluter med en rak kant och Enter avslutar. Bågens mittgrepp ändrar krökningen. JOIN kan sammanfoga linjer, bågar och öppna polylinjer; EXPLODE ger tillbaka linjer och bågar. Bågsegment lagras som DXF-bulge, inte som korta raka linjer.
@@ -228,7 +229,7 @@ Windows Utforskarens riktiga standardappsval måste verifieras på Windows.
 DXF-referenser: [INSERT](https://help.autodesk.com/cloudhelp/2021/ENU/AutoCAD-DXF/files/GUID-28FA4CFB-9D5E-4880-9F11-36C97578252F.htm), [LWPOLYLINE](https://help.autodesk.com/cloudhelp/2015/ENU/AutoCAD-DXF/files/GUID-748FC305-F3F2-4F74-825A-61F04D757A50.htm), [DIMENSION](https://help.autodesk.com/cloudhelp/2023/ENU/AutoCAD-DXF/files/GUID-239A1BDD-7459-4BB9-8DD7-08EC79BF1EB0.htm).
 
 ### WBLOCK · separata mallfiler
-`WBLOCK` (`WB`) eller **Exportera mall · DXF** under Ändra skriver en separat
+`WBLOCK` (`WB`) eller **Exportera mall** under Block skriver en separat
 DXF-fil via en dialog med källa, baspunkt, originalobjekt och sparplats.
 
 - **Valda objekt:** använd markeringen eller klicka **Välj objekt i modellen**,

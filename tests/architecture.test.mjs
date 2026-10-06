@@ -19,8 +19,16 @@ import { blockTools } from "../src/block-tools.js";
 import { viewportTools } from "../src/viewport-tools.js";
 import { annotationTools } from "../src/annotation-tools.js";
 import { utilityTools } from "../src/utility-tools.js";
+import { toolbarGroups } from '../src/toolbar-groups.js';
 
 const root = new URL("../src/", import.meta.url);
+test('every catalog command has a toolbar home and block workflows stay together', () => {
+  const commands=Object.values(toolbarGroups).flatMap(groups=>groups.flatMap(group=>group.commands));
+  assert.equal(new Set(commands).size,commands.length);
+  assert.deepEqual([...commands].sort(),definitions.map(([name])=>name).filter(name=>name!=='MVIEW').sort());
+  const blocks=toolbarGroups.block.flatMap(group=>group.commands);
+  for(const name of ['BLOCK','INSERT','BEDIT','BSTRETCH','ATTDEF','WBLOCK'])assert.ok(blocks.includes(name),name);
+});
 test("all interactive catalog commands have one tool owner; block session entry is handled by the shell", () => {
   const owners = new Map();
   for (const tools of [drawingTools, stretchTools, wblockTools, transformTools, editingTools, cornerTools, vertexTools, structureTools, dimensionTools, blockTools, viewportTools, annotationTools, utilityTools]) {
