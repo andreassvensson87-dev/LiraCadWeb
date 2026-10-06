@@ -16,7 +16,7 @@ På den här datorn finns också `Starta LiraCAD.command`, som använder Codex m
 
 - Öppna **Inställningar** i toppraden för att generera en exempelritning eller ett stresstest med 1 000, 10 000 eller 100 000 objekt. Välj blandade objekt eller enbart linjer. Genereringen ersätter ritningen och kan återställas med `U`/Ångra under samma session. Där finns också valet av navigeringsenhet.
 - För reproducerbara utvecklarprov, öppna `/tests/performance/` på den lokala servern. Se [mätresultat och kvarvarande begränsningar](docs/performance.md).
-- Exempelritningen innehåller alla objekttyper. Klicka för att markera eller dra en markeringsruta. Shift lägger till/tar bort ur markeringen.
+- Exempelritningen innehåller alla objekttyper. Klicka på ett objekt för att markera det. Dra en markeringsruta eller klicka på en tom plats och sedan på rutans motsatta hörn. Vänster till höger väljer helt inneslutna objekt; höger till vänster väljer också korsade objekt. Esc avbryter rutan. Shift lägger till/tar bort ur markeringen.
 - Skriv `L`, Enter, `0,0`, Enter, `1000,0`, Enter, Enter. En linje skapas med exakt längd.
 - Markera linjen, skriv `M`, Enter, välj baspunkt och målpunkt. `@500,0` anger en relativ förflyttning.
 - Ändra koordinater i högerpanelen. Enter eller att lämna fältet bekräftar. Escape återställer fältinmatning som inte bekräftats.
@@ -219,6 +219,7 @@ Windows Utforskarens riktiga standardappsval måste verifieras på Windows.
 ## Block, attribut och bågpolylinjer
 
 - **BLOCK / B:** markera objekt, ange ett unikt blocknamn och välj baspunkt. **INSERT / I:** ange blocknamnet och välj insättningspunkt. Knappar finns under Redigera. Definitionerna bevaras i projektet även om sista instansen raderas. Kopiera, flytta, rotera, skala, spegla, snap och insättningsgrepp fungerar. **X / EXPLODE** delar upp blocket igen.
+- Markerade block har dessutom ett flyttgrepp vid geometrins mitt, så även importerade block med en avlägsen insättningspunkt kan flyttas med grepp i vyn. Greppet flyttar hela instansen; definition och stretchvärden behålls.
 - **ATTDEF / ATT:** markera en enkelradig text och ange ett attributnamn (A–Z, 0–9, _). Ta med texten när blocket skapas. Varje infogat block har egna värden som ändras i inspektorn. Nya instanser får definitionens standardvärden. BEDIT finns; se blockeditorn nedan. Nästlade block, AutoCADs dynamiska blockfunktioner och multiline-attribut ingår inte i denna första version.
 - **PL / PLINE:** välj startpunkt och fortsätt med raka segment. **A** växlar till båge via en mellanpunkt och en slutpunkt. **L** återgår till linje, **U** ångrar senaste segment/mellanpunkt, **C** sluter med en rak kant och Enter avslutar. Bågens mittgrepp ändrar krökningen. JOIN kan sammanfoga linjer, bågar och öppna polylinjer; EXPLODE ger tillbaka linjer och bågar. Bågsegment lagras som DXF-bulge, inte som korta raka linjer.
 - OFFSET, TRIM/EXTEND och lägg till/ta bort hörn stöder ännu inte bågpolylinjer som redigeringsmål; kommandot säger till. Dela upp med X först. Bågpolylinjer fungerar som trimgränser.

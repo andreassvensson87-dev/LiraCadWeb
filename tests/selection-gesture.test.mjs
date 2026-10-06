@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {beginSelectionGesture,moveSelectionGesture,releaseSelectionGesture} from '../src/selection-gesture.js';import {grips,gripEntity,gripTargets,moveGripTargets} from '../src/grips.js';import {bounds} from '../src/entity-geometry.js';
+const p=(x,y)=>({x,y});
+test('empty click retains the first corner; a second click finishes a window with the original world point and direction',()=>{
+ const first=beginSelectionGesture(p(10,10),p(100,200)),pending=releaseSelectionGesture(first,p(10,10),p(100,200),null);assert.equal(pending.kind,'pending');const moved=moveSelectionGesture(pending.gesture,p(50,70)),result=releaseSelectionGesture({...moved,phase:'finish'},p(50,70),p(500,-400),'ignored');assert.equal(result.kind,'rectangle');assert.equal(result.crossing,false);assert.deepEqual(result.region,{minX:100,maxX:500,minY:-400,maxY:200});assert.deepEqual(first.world,p(100,200));
+});
+test('drag selection works in both directions, including missing move events; a clicked object selects immediately',()=>{
+ const first=beginSelectionGesture(p(80,10),p(800,100),true),result=releaseSelectionGesture(first,p(10,80),p(100,-600),null);assert.equal(result.kind,'rectangle');assert.equal(result.crossing,true);assert.equal(result.shift,true);assert.deepEqual(releaseSelectionGesture(first,p(80,10),p(800,100),'line'),{kind:'click',id:'line',shift:true});
+});
+test('block move grip stays near geometry with a distant imported insertion point and applies displacement without changing its definition',()=>{
+ const block={id:'b',type:'block',layer:'0',point:p(0,0),rotation:0,scale:1,definition:{id:'def',name:'Imported',entities:[{id:'poly',type:'polyline',layer:'0',closed:true,points:[p(10000,20000),p(11000,20000),p(11000,20500),p(10000,20500)]}]},values:{}},before=JSON.stringify(block),g=grips(block).find(g=>g.kind==='blockMove');assert.deepEqual(g.p,p(10500,20250));const moved=gripEntity(block,g,p(10600,20450));assert.deepEqual(moved.point,p(100,200));assert.deepEqual(bounds(moved),{minX:10100,maxX:11100,minY:20200,maxY:20700});assert.equal(JSON.stringify(block),before);assert.deepEqual(moveGripTargets(gripTargets([block],g.p),p(10600,20450))[0].point,p(100,200));
+});

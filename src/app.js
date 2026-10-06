@@ -15,6 +15,7 @@ import { Editor } from "./editor.js";
 import { drawingTools } from "./drawing-tools.js";
 import { stretchTools } from "./stretch-tools.js";
 import { wblockTools } from "./wblock-tools.js";
+import { beginSelectionGesture, moveSelectionGesture, releaseSelectionGesture } from "./selection-gesture.js";
 import { transformTools, applyTransformChange } from "./transform-tools.js";
 import { editingTools, applyEditingChange } from "./editing-tools.js";
 import { cornerTools } from "./corner-tools.js";
@@ -794,6 +795,7 @@ function cancel(clear = true) {
   update();
 }
 function start(name) {
+  drag=null;
   if (textEditor.active && !finishTextEdit(true)) return;
   name = aliases[name.toUpperCase()] || name.toUpperCase();
   if (["MT", "MTEXT"].includes(name)) name = "TEXT";
@@ -1214,6 +1216,10 @@ canvas.addEventListener("pointerdown", (ev) => {
     canvas.style.cursor = "grabbing";
     return;
   }
+  if(drag?.kind==='select'&&drag.phase==='corner'){
+    drag={...drag,phase:'finish'};
+    schedule();return;
+  }
   if (!tool) {
     let closest = null,
       distance = 8;
@@ -1265,13 +1271,7 @@ canvas.addEventListener("pointerdown", (ev) => {
     schedule();
     return;
   }
-  drag = {
-    kind: "select",
-    start: { ...mouse },
-    world: rawCursor,
-    shift: ev.shiftKey,
-    moved: false,
-  };
+  drag = beginSelectionGesture(mouse,rawCursor,ev.shiftKey);
 });
 // Suppress native middle-button autoscroll/paste without affecting CAD pan.
 for (const name of ["mousedown", "auxclick"]) {
@@ -1285,8 +1285,8 @@ canvas.addEventListener("pointermove", (ev) => {
     navigating();
     const delta = cameraVector(camera, -(mouse.x - drag.start.x) / camera.scale, (mouse.y - drag.start.y) / camera.scale);
     camera.x = drag.camera.x + delta.x; camera.y = drag.camera.y + delta.y;
-  } else if (["select", "viewportMove"].includes(drag?.kind))
-    drag.moved = dist(mouse, drag.start) > 4;
+  } else if(drag?.kind==='select')drag=moveSelectionGesture(drag,mouse);
+  else if(drag?.kind==='viewportMove')drag.moved = dist(mouse, drag.start) > 4;
   else if (!tool && !drag) {
     const e = hit(rawCursor);
     hover = e?.id || null;
@@ -1306,29 +1306,26 @@ canvas.addEventListener("pointerup", (ev) => {
       replaceEntities("Flytta viewport",doc.entities.map((x) => (x.id === e.id ? e : x)));
     }
   } else if (drag.kind === "select") {
-    if (drag.moved) {
-      const a = drag.world,
-        b = rawCursor,
-        r = {
-          minX: Math.min(a.x, b.x),
-          maxX: Math.max(a.x, b.x),
-          minY: Math.min(a.y, b.y),
-          maxY: Math.max(a.y, b.y),
-        },
+    const action=releaseSelectionGesture(drag,mouse,rawCursor,drag.moved||drag.phase==='finish'?null:hit(rawCursor)?.id);
+    if(action.kind==='pending'){
+      drag=action.gesture;
+      if(!drag.shift)selection.clear();
+      log('Markering · Ange motsatt hörn eller Esc.');
+      update();return;
+    }
+    if (action.kind==='rectangle') {
+      const r=action.region,
         ids = (interactionEntities||doc.entities)
           .filter(
-            (e) => editable(e) && rectSelect(e, r, mouse.x < drag.start.x),
+            (e) => editable(e) && rectSelect(e, r, action.crossing),
           )
           .map((e) => e.id);
-      if (!drag.shift) selection.clear();
+      if (!action.shift) selection.clear();
       ids.forEach((id) => selection.add(id));
     } else {
-      const e = hit(rawCursor);
-      if (!drag.shift) selection.clear();
-      if (e) {
-        if (drag.shift && selection.has(e.id)) selection.delete(e.id);
-        else selection.add(e.id);
-      }
+      if (!action.shift) selection.clear();
+      if (action.shift && selection.has(action.id)) selection.delete(action.id);
+      else selection.add(action.id);
     }
   } else if (drag.kind === "grip" && dist(mouse, drag.start) > 4) {
     const changed = moveGripTargets(drag.targets, cursor);

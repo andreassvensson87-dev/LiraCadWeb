@@ -1,4 +1,5 @@
 import { parameterGrips, moveParameterGrip } from "./parametric-blocks.js";
+import { bounds } from "./entity-geometry.js";
 import { polylineParts, hasBulges } from "./polyline.js";
 import { clone } from "./values.js";
 import { polar, dist, arcThrough } from "./geometry.js";
@@ -33,7 +34,11 @@ export function grips(e) {
     const y = -(l.top + l.bottom) / 2 * (e.textMirrorY ? -1 : 1), r = e.rotation || 0;
     return [{ p: e.point, kind: "text" }, { p: { x: e.point.x + x * Math.cos(r) - y * Math.sin(r), y: e.point.y + x * Math.sin(r) + y * Math.cos(r) }, kind: "textWidth" }];
   }
-  if (e.type === "block") return [{ p: e.point, kind: "text" },...parameterGrips(e)];
+  if (e.type === "block") {
+    const b=bounds(e),center={x:(b.minX+b.maxX)/2,y:(b.minY+b.maxY)/2};
+    const parameters=parameterGrips(e);
+    return [{p:e.point,kind:'text'},...(dist(center,e.point)>1e-7&&!parameters.some(g=>dist(g.p,center)<1e-7)?[{p:center,kind:'blockMove'}]:[]),...parameters];
+  }
   if (e.type === "circle")
     return [
       { p: e.center, kind: "center" },
@@ -55,6 +60,7 @@ export function grips(e) {
 }
 
 export function gripEntity(e, g, p) {
+  if(g.kind==='blockMove')return {...clone(e),point:{x:e.point.x+p.x-g.p.x,y:e.point.y+p.y-g.p.y}};
   if (g.kind === "blockStretch") {try{return moveParameterGrip(e,g.parameterId,p);}catch{return e;}}
   const n = clone(e);
   if (g.kind === "point") {

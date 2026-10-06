@@ -224,8 +224,8 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
             ctx.fillStyle = "#17292e";
             ctx.strokeStyle = "#8ee8b8";
             ctx.lineWidth = 1;
-            ctx.fillRect(p.x - 3, p.y - 3, 6, 6);
-            ctx.strokeRect(p.x - 3, p.y - 3, 6, 6);
+            ctx.fillRect(p.x - 4, p.y - 4, 8, 8);
+            ctx.strokeRect(p.x - 4, p.y - 4, 8, 8);
           }
       }
       for (const e of frame.previews) drawEntity(e, "#8ae4b6", false, true);
