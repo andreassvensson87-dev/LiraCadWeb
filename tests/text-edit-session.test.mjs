@@ -43,22 +43,41 @@ test("editing a removed object fails without inserting it again", () => {
 });
 test("text presentation retains box on save failure and supports correction, composition and cancel", () => {
   class Element {
+    options = [{ value: "Arial" }, { value: "Georgia" }, { value: "Courier New" }];
+    querySelectorAll() { return []; }
+    append(option) { this.options.push(option); }
     style = {}; attrs = {}; handlers = {}; hidden = true; value = "";
     setAttribute(k, v) { this.attrs[k] = v; }
     addEventListener(k, fn) { this.handlers[k] = fn; }
     focus() {} setSelectionRange() {}
   }
-  const elements = Object.fromEntries(["text-editor", "inline-text", "text-font", "text-bold", "text-italic", "text-underline", "text-apply", "text-cancel"].map((id) => [id, new Element()]));
+  const elements = Object.fromEntries(["text-editor", "text-target", "inline-text", "text-font", "text-bold", "text-italic", "text-underline", "text-apply", "text-cancel", "text-align", "text-vertical", "text-rotation", "text-height", "text-spacing", "text-spacing-style", "text-tracking", "text-width-factor", "text-width"].map((id) => [id, new Element()]));
   let fail = true, finished = 0; const errors = [];
-  const view = createTextEditor({ document: { querySelector: (selector) => elements[selector.slice(1)] }, screen: () => ({ x: 20, y: 20 }), getSize: () => ({ width: 900, height: 600 }),
+  const view = createTextEditor({ document: { querySelector: (selector) => elements[selector.slice(1)], createElement: () => ({ dataset: {} }) }, screen: () => ({ x: 20, y: 20 }), getSize: () => ({ width: 900, height: 600 }),
     beforeBegin() {}, refresh() {}, log: (message) => errors.push(message),
     applyChange: () => { if (fail) throw Error("rejected"); }, afterFinish: () => { finished++; },
   });
   view.begin(entity); elements["inline-text"].value = "Changed";
   elements["text-bold"].onclick(); assert.equal(view.active.entity.bold, true); assert.equal(elements["inline-text"].style.fontWeight, "700");
+  elements["text-align"].value = "right"; elements["text-align"].onchange();
+  elements["text-spacing"].value = "1.2"; elements["text-spacing"].onchange();
+  elements["text-tracking"].value = "1.5"; elements["text-tracking"].onchange();
+  assert.equal(view.active.entity.textAlign, "right"); assert.equal(view.active.entity.lineSpacing, 2); assert.equal(view.active.entity.tracking, 1.5);
+  elements["text-tracking"].value = "0.1"; elements["text-tracking"].onchange(); assert.equal(view.active.entity.tracking, 1.5);
   elements["text-apply"].onclick(); assert.equal(elements["text-editor"].hidden, false); assert.equal(view.active.closed, false); assert.equal(finished, 0);
   assert.equal(view.begin({ ...entity, id: "other" }), false); assert.equal(view.active.entity.id, entity.id);
   elements["inline-text"].handlers.keydown({ isComposing: true, key: "Escape", stopPropagation() {} }); assert.ok(view.active);
   fail = false; elements["text-apply"].onclick(); assert.equal(elements["text-editor"].hidden, true); assert.equal(view.active, null); assert.equal(finished, 1);
   view.begin(entity); elements["text-cancel"].onclick(); assert.equal(view.active, null); assert.equal(finished, 2);
+});
+
+test('live text drafts do not change accepted document or formatting until committed',()=>{
+ const {parent,session,apply}=fixture();session.entity.textRuns=[{text:'Before',bold:true}];const before=structuredClone(parent.document);
+ const draft=session.draft('Preview\r\nLine');assert.equal(draft.text,'Preview\nLine');assert.equal(draft.textRuns,undefined);draft.height=99;
+ assert.equal(session.entity.height,12);assert.deepEqual(parent.document,before);assert.equal(parent.history.past.length,0);
+ assert.equal(session.draft('Before').textRuns[0].bold,true);
+ session.finish(false,'Preview',apply);assert.deepEqual(parent.document,before);assert.equal(parent.history.past.length,0);
+});
+test('empty attribute values can be accepted without deleting their text definition',()=>{
+ const {session}=fixture();session.entity.attributeTag='TAG';let accepted;session.finish(true,'',change=>accepted=change.entities[0]);assert.equal(accepted.text,'');assert.equal(accepted.attributeTag,'TAG');
 });

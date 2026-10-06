@@ -21,5 +21,23 @@
       "type": "image/png",
       "purpose": "any"
     }
-  ]
+  ],
+  "file_handlers": [
+    {
+      "action": "./",
+      "name": "LiraCAD-ritning",
+      "accept": {
+        "image/vnd.dwg": [
+          ".dwg"
+        ],
+        "image/vnd.dxf": [
+          ".dxf"
+        ]
+      },
+      "launch_type": "single-client"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }

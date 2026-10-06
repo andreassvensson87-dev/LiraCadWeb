@@ -1,5 +1,6 @@
 import { dimensionParts } from "./dimensions.js";
 import { add, sub, mul, dist, angle, polar } from "./geometry.js";
+import { textLayout } from "./text.js";
 export function splitDimension(e) {
   if (!e.chain) return [e];
   const points = e.points
@@ -15,7 +16,7 @@ export function splitDimension(e) {
 }
 export function writeDimension(e, start, pair, point) {
   const [a, b, c, d] = e.points;
-  const text = dimensionParts(e).find((p) => p.type === "text");
+  const text = dimensionParts(e).find((p) => p.type === "text") || dimensionParts({...e,dimensionGraphics:undefined}).find(p=>p.type==='text');
   let definition = c;
   if (e.kind === "linear" || e.kind === "aligned") {
     const u =
@@ -32,19 +33,13 @@ export function writeDimension(e, start, pair, point) {
   pair(2, e._dimBlock);
   point(definition);
   pair(30, 0);
-  const center = add(
-    text.point,
-    polar(
-      { x: 0, y: 0 },
-      text.text.length * text.height * 0.325,
-      text.rotation || 0,
-    ),
-  );
+  const layout=textLayout(text), x=(layout.x+layout.width/2)*layout.fit*(text.textMirrorX?-1:1), y=-(layout.top+layout.bottom)/2*(text.textMirrorY?-1:1), rotation=text.rotation||0;
+  const center = e.dimensionTextPoint || add(text.point,{x:x*Math.cos(rotation)-y*Math.sin(rotation),y:x*Math.sin(rotation)+y*Math.cos(rotation)});
   point(center, 11, 21);
   pair(31, 0);
   pair(
     70,
-    32 + { linear: 0, aligned: 1, diameter: 3, radius: 4, angular: 5 }[e.kind],
+    32 + (e.dimensionTextPoint?128:0) + { linear: 0, aligned: 1, diameter: 3, radius: 4, angular: 5 }[e.kind],
   );
   pair(71, 5);
   pair(1, e.text || "<>");
@@ -78,7 +73,7 @@ export function writeDimension(e, start, pair, point) {
     pair(35, 0);
   }
 }
-export function dimensionStyles(styles, pair, handle) {
+export function dimensionStyles(styles, pair, handle,textStyleHandles=new Map()) {
   const table = handle();
   pair(0, "TABLE");
   pair(2, "DIMSTYLE");
@@ -88,7 +83,7 @@ export function dimensionStyles(styles, pair, handle) {
   pair(70, styles.length);
   pair(100, "AcDbDimStyleTable");
   pair(71, 0);
-  for (const { name, height, precision } of styles) {
+  for (const { name, height, precision,arrowSize,extensionOffset,extensionOvershoot,textGap,measurementScale,dimensionPost,decimalSeparator,zeroSuppress,fontStyle } of styles) {
     pair(0, "DIMSTYLE");
     pair(105, handle());
     pair(330, table);
@@ -97,11 +92,14 @@ export function dimensionStyles(styles, pair, handle) {
     pair(2, name);
     pair(70, 0);
     pair(40, 1);
-    pair(41, height * 0.85);
-    pair(42, 0);
-    pair(44, height * 0.5);
+    pair(41, arrowSize ?? height * 0.85);
+    pair(42, extensionOffset ?? 0);
+    pair(44, extensionOvershoot ?? height * 0.5);
     pair(140, height);
-    pair(147, height * 0.45);
+    pair(147, textGap ?? height * 0.45);
+    pair(144, measurementScale ?? 1);
+    pair(3,dimensionPost || '<>');pair(278,(decimalSeparator||'.').charCodeAt(0));pair(78,zeroSuppress||0);
+    if(textStyleHandles.has(fontStyle))pair(340,textStyleHandles.get(fontStyle));
     pair(271, precision);
     pair(179, precision);
     pair(277, 2);

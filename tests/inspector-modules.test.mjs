@@ -81,7 +81,7 @@ test("layout callbacks look up draft by identity, validate names and undo remova
   createLayoutInspector({ ...controls, getDocument: () => session.document,
     commit: (label, change) => session.commit(label, change), log: (m) => messages.push(m), refresh() {}, afterFormat: () => formats++, afterRemove: () => removed++,
   })(root, "paper");
-  const [name, format, remove] = root.children[0].children;
+  const [name, format, , remove] = root.children[0].children;
   for (const value of ["", "Model", "other"]) name.change(value);
   assert.equal(messages.length, 3); assert.equal(session.history.past.length, 0);
   name.change("Renamed"); format.change("297x210");

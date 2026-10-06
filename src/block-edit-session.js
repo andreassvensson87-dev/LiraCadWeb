@@ -12,7 +12,7 @@ export class BlockEditSession {
     this.draft = new DocumentSession({
       version: 1, name: definition.name, layers: clone(parent.document.layers),
       entities: clone(definition.entities).map((e) => ({ ...e, space: "model" })),
-      blockBase: { x: 0, y: 0 },
+      blockBase: { x: 0, y: 0 }, stretchParameters:clone(definition.stretchParameters||[]),
     });
   }
   get document() { return this.documentSession.document; }

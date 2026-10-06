@@ -3,6 +3,7 @@ export const icons = {
   BEDIT:
     '<rect x="3" y="3" width="18" height="18"/><path d="m8 16 2-5 6-6 3 3-6 6z"/>',
   BLOCK: '<rect x="3" y="3" width="18" height="18"/><path d="M8 8h8v8H8z"/>',
+  WBLOCK: '<path d="M12 3H3v18h18v-9M13 3h8v8M21 3l-9 9"/><rect x="6" y="12" width="6" height="6"/>',
   INSERT:
     '<rect x="3" y="3" width="12" height="12"/><path d="M18 12v10m-5-5h10"/>',
   ATTDEF: '<path d="M3 19 9 5l6 14M5 14h8m4-8h6m-3 0v13"/>',
@@ -17,6 +18,8 @@ export const icons = {
   TEXT: '<path d="M4 5V3h16v2M12 3v18m-4 0h8"/>',
   LEADER: '<path d="m3 20 8-13h10M3 20l1-7 5 3z"/>',
   HATCH: '<path d="M3 3h18v18H3zM3 11l8-8M3 19 19 3M9 21 21 9M17 21l4-4"/>',
+  STRETCH: '<path d="M3 5h8v14H3zM11 5h10v14H11M7 12h14m-4-3 4 3-4 3"/>',
+  BSTRETCH: '<path d="M3 5h18v14H3zM7 12h10m-3-3 3 3-3 3M7 8v8"/>',
   MOVE: '<path d="M12 2v20M2 12h20M8 6l4-4 4 4M8 18l4 4 4-4M6 8l-4 4 4 4M18 8l4 4-4 4"/>',
   COPY: '<rect x="8" y="8" width="12" height="12"/><path d="M5 16H3V3h13v2"/>',
   ROTATE: '<path d="M4 9a8 8 0 1 1 0 6M3 3v6h6"/>',

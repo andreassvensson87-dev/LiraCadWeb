@@ -1,6 +1,7 @@
 import { readDrawingFile } from "./file-import.js";
 import { validDocument } from "./document.js";
 import { toDXF } from "./dxf-export.js";
+import { wblockDXF } from "./wblock.js";
 
 // Coordinates accepted documents and file operations; UI and storage are injected.
 export function createDocumentWorkflow({
@@ -48,5 +49,12 @@ export function createDocumentWorkflow({
     download(`${document.name}.dxf`, toDXF(document), "application/dxf");
     return true;
   }
-  return { open, replace, save, exportDXF, get opening() { return opening; } };
+  function exportWblock(request) {
+    if(hasBlockEdit())throw Error("Spara eller avbryt blockredigeringen först.");
+    if(!finishText())throw Error("Avsluta textredigeringen innan mallen exporteras.");
+    const file=wblockDXF(getDocument(),request);
+    download(file.name,file.text,file.type);
+    return file.count;
+  }
+  return { open, replace, save, exportDXF, exportWblock, get opening() { return opening; } };
 }

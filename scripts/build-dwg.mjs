@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 const root = path.resolve(import.meta.dirname, "..");
+await import("./prepare-dwg-source.mjs");
 const temporary = await mkdtemp(path.join(tmpdir(), "liracad-dwg-"));
 const target = path.join(root, "src/vendor/dwg/_framework");
 try {

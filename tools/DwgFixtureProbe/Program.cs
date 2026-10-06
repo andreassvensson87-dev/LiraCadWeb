@@ -1,0 +1,12 @@
+using System;
+using System.IO;
+using System.Text;
+using System.Collections.Generic;
+using System.Text.Json;
+using ACadSharp.IO;
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+var messages = new HashSet<string>();
+var doc = DwgReader.Read(args[0], (_, e) => messages.Add(e.Message));
+DxfWriter.Write(args[1], doc, false, notification: (_,e) => messages.Add(e.Message));
+File.WriteAllText(args[1]+".messages.json", JsonSerializer.Serialize(messages));
+Console.WriteLine("Converted: "+args[1]);

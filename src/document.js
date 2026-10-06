@@ -1,3 +1,7 @@
+import { validStretchParameters, validParameterValues, evaluatedBlockEntities } from "./parametric-blocks.js";
+import { validTextColumns } from "./text-columns.js";
+import { validAnnotation } from "./annotation-context.js";
+import { validFont } from "./text.js";
 import { TAU, dist } from "./geometry.js";
 import { validLineType } from "./linetypes.js";
 import { validAttributeSchema } from "./attributes.js";
@@ -35,6 +39,8 @@ export function validDocument(d) {
       ))
   )
     return false;
+  if(!validStretchParameters(d.stretchParameters,d.entities))return false;
+  if(d.layouts?.some(l=>l.monochrome!=null && typeof l.monochrome!=='boolean'))return false;
   if (
     d.blocks != null &&
     (!Array.isArray(d.blocks) ||
@@ -67,6 +73,10 @@ export function validDocument(d) {
     )
       return false;
     if (!validLineType(l.lineType) || l.lineType === "BYLAYER") return false;
+    if (l.linePattern != null && (!Array.isArray(l.linePattern) || l.linePattern.length > 100 || l.linePattern.some(v => !Number.isFinite(v)))) return false;
+    if (l.lineWeight != null && (!Number.isFinite(l.lineWeight) || l.lineWeight < 0 || l.lineWeight > 100)) return false;
+    if(l.plot!=null && typeof l.plot!=='boolean')return false;
+    if(l.cadColor7!=null && typeof l.cadColor7!=='boolean')return false;
     ls.add(l.id);
   }
   const pt = (p) =>
@@ -96,7 +106,14 @@ export function validDocument(d) {
       ].includes(e.type)
     )
       return false;
+    if (!validAnnotation(e, pt)) return false;
+    if(e.annotationVariants!=null){
+      const variants=e.annotationVariants;
+      if(!Array.isArray(variants)||variants.length>100||new Set(variants.map(v=>v?.denominator)).size!==variants.length||variants.some(v=>!v||!Number.isFinite(v.denominator)||v.denominator<=0||!v.entity||v.entity.type!==e.type||v.entity.annotationVariants!=null||v.entity.annotationContexts!=null||v.entity.annotationBase!=null||!validDocument({version:1,layers:d.layers,layouts:d.layouts,entities:[{...v.entity,id:e.id,layer:e.layer,space:e.space}]})))return false;
+    }
     if (!validLineType(e.lineType)) return false;
+    if (e.lineScale != null && (!Number.isFinite(e.lineScale) || e.lineScale <= 0)) return false;
+    if (e.linePattern != null && (!Array.isArray(e.linePattern) || e.linePattern.length > 100 || e.linePattern.some(v => !Number.isFinite(v)))) return false;
     ids.add(e.id);
     if (e.type === "block") {
       const def = e.definition;
@@ -127,6 +144,10 @@ export function validDocument(d) {
         )
       )
         return false;
+      if(!validStretchParameters(def.stretchParameters,def.entities)||!validParameterValues(e.parameterValues,def.stretchParameters))return false;
+      if(e.parameterValues && Object.keys(e.parameterValues).length)try{
+        if(!validDocument({version:1,layers:d.layers,entities:evaluatedBlockEntities(e)}))return false;
+      }catch{return false;}
       const tags = def.entities
         .filter((part) => part.attributeTag)
         .map((part) => part.attributeTag);
@@ -147,6 +168,7 @@ export function validDocument(d) {
     )
       return false;
     if (e.type === "dimension" && !validDimension(e, pt)) return false;
+    if(e.dimensionGraphics!=null && (e.type!=="dimension" || !Array.isArray(e.dimensionGraphics) || !e.dimensionGraphics.length || e.dimensionGraphics.length>10000 || e.dimensionGraphics.some(p=>!p || ['block','dimension','viewport'].includes(p.type)) || typeof e.dimensionGraphicsState!=='string' || e.dimensionGraphicsState.length>100000 || !validDocument({version:1,layers:d.layers,entities:e.dimensionGraphics})))return false;
     if (
       e.space &&
       e.space !== "model" &&
@@ -174,6 +196,28 @@ export function validDocument(d) {
         !e.points.every(pt))
     )
       return false;
+    if (e.hidden != null && typeof e.hidden !== "boolean") return false;
+    if (e.lineWeight != null && (!Number.isFinite(e.lineWeight) || e.lineWeight < 0 || e.lineWeight > 100)) return false;
+    if (e.viewRotation != null && (e.type !== "viewport" || !Number.isFinite(e.viewRotation))) return false;
+    if (e.type === "hatch" && e.holes != null && (!Array.isArray(e.holes) || e.holes.length > 1000 || e.holes.some(loop => !Array.isArray(loop) || loop.length < 3 || loop.length > 20000 || !loop.every(pt)))) return false;
+    if (e.type === "text" || e.type === "dimension") {
+      if (e.textColumns != null && (e.type !== "text" || !validTextColumns(e.textColumns))) return false;
+      if (e.font != null && !validFont(e.font)) return false;
+      for (const key of ["textWidth", "textFitWidth", "lineSpacing", "widthFactor"]) if (e[key] != null && (!Number.isFinite(e[key]) || e[key] < 0 || (key !== "textWidth" && !e[key]))) return false;
+      if (e.oblique != null && (!Number.isFinite(e.oblique) || Math.abs(e.oblique) >= Math.PI / 2)) return false;
+      if (e.textAttachment != null && (!Number.isInteger(e.textAttachment) || e.textAttachment < 1 || e.textAttachment > 9)) return false;
+      if (e.textAlign != null && !["left", "center", "right"].includes(e.textAlign)) return false;
+      if (e.textVertical != null && !["baseline", "bottom", "middle", "top"].includes(e.textVertical)) return false;
+      if (e.paragraphAlign != null && !["left", "center", "right"].includes(e.paragraphAlign)) return false;
+      if (e.tracking != null && (!Number.isFinite(e.tracking) || e.tracking < 0.75 || e.tracking > 4)) return false;
+      if (Array.isArray(e.textRuns) && e.textRuns.some(r => (r?.tracking != null && (!Number.isFinite(r.tracking) || r.tracking < 0.75 || r.tracking > 4)) || (r?.paragraphAlign != null && !["left", "center", "right"].includes(r.paragraphAlign)))) return false;
+      if (e.textRuns != null && (!Array.isArray(e.textRuns) || e.textRuns.length > 20000 || e.textRuns.some(r => !r || typeof r.text !== "string" || (r.font != null && !validFont(r.font)) || (r.color != null && !/^#[\da-f]{6}$/i.test(r.color)) || ["heightScale", "widthFactor"].some(k => r[k] != null && (!Number.isFinite(r[k]) || r[k] <= 0)) || (r.oblique != null && (!Number.isFinite(r.oblique) || Math.abs(r.oblique) >= Math.PI/2))))) return false;
+    }
+    if (e.attributeOverrides != null) {
+      if (e.type !== "block" || typeof e.attributeOverrides !== "object" || Array.isArray(e.attributeOverrides)) return false;
+      const parts = Object.values(e.attributeOverrides);
+      if (parts.some(p => p?.type !== "text") || !validDocument({ version: 1, layers: d.layers, entities: parts })) return false;
+    }
     if (e.type === "line" && e.points.length !== 2) return false;
     if (
       hasBulges(e) &&
@@ -211,6 +255,8 @@ export function validDocument(d) {
       return false;
     if (e.type === "hatch" && (!Number.isFinite(e.spacing) || e.spacing <= 0))
       return false;
+    if(e.hatchPattern!=null && (e.type!=="hatch" || !Array.isArray(e.hatchPattern) || !e.hatchPattern.length || e.hatchPattern.length>1000 || e.hatchPattern.some(l=>!l || !Number.isFinite(l.angle) || !pt(l.base) || !pt(l.offset) || !Array.isArray(l.dashes) || l.dashes.length>100 || l.dashes.some(d=>!Number.isFinite(d)))))return false;
+    if(e.patternName!=null && (typeof e.patternName!=="string" || e.patternName.length>100))return false;
   }
   return true;
 }

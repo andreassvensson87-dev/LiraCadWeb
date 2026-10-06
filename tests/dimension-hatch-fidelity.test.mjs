@@ -1,0 +1,70 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {importDXF} from '../src/dxf-import.js';
+import {toDXF} from '../src/dxf-export.js';
+import {dimensionParts,dimensionGraphicsState,dimensionChain} from '../src/dimensions.js';
+import {transformed} from '../src/entity-transform.js';
+import {gripEntity} from '../src/grips.js';
+import {hatchPattern,hatchSegments} from '../src/hatch-pattern.js';
+import {affineEntity} from '../src/dxf-curves.js';
+import {validDocument} from '../src/document.js';
+import {layoutSVG} from '../src/plot.js';
+const dxf=(entities,tables=[],blocks=[])=>[0,'SECTION',2,'TABLES',...tables,0,'ENDSEC',0,'SECTION',2,'BLOCKS',...blocks,0,'ENDSEC',0,'SECTION',2,'ENTITIES',...entities,0,'ENDSEC',0,'EOF'].join('\n')+'\n';
+const tables=[0,'STYLE',5,'AA',2,'ISO',3,'isocp.shx',0,'DIMSTYLE',2,'DIM',40,100,140,3,41,2,42,4,44,1,147,.8,144,1,271,0,340,'AA'];
+const dim=[0,'DIMENSION',8,'0',2,'*D1',3,'DIM',70,32,10,200,20,-30,13,0,23,0,14,200,24,0,1,'min <>',1001,'ACAD',1000,'DSTYLE',1002,'{',1070,40,1040,20,1002,'}'];
+const picture=[0,'BLOCK',2,'*D1',10,0,20,0,0,'TEXT',8,'0',10,-50,20,-30,40,60,1,'min 200',7,'ISO',0,'LINE',8,'0',10,0,20,-30,11,200,21,-30,0,'ENDBLK'];
+test('native dimension overrides, font and exact picture survive transforms and native export',()=>{
+ const doc=importDXF(dxf(dim,tables,picture)).document,e=doc.entities[0];
+ assert.equal(e.height,60);assert.equal(e.arrowSize,40);assert.equal(e.extensionOffset,80);assert.equal(e.sourceFont,'isocp.shx');
+ assert.equal(dimensionParts(e)[0].text,'min 200');assert.deepEqual(dimensionParts(e)[0].point,{x:-50,y:-30});
+ const moved=transformed(e,'MOVE',{x:0,y:0},{x:100,y:200});assert.equal(moved.dimensionGraphicsState,dimensionGraphicsState(moved));
+ assert.deepEqual(dimensionParts(moved)[0].point,{x:50,y:170});
+ const scaled=transformed(e,'SCALE',{x:0,y:0},null,2);assert.equal(scaled.height,120);assert.equal(scaled.arrowSize,80);assert.equal(scaled.extensionOffset,160);assert.equal(dimensionParts(scaled)[0].height,120);assert.equal(dimensionParts(scaled)[0].text,'min 400');
+ const restored=importDXF(toDXF(doc)).document.entities[0];assert.equal(restored.height,60);assert.equal(restored.arrowSize,40);assert.equal(restored.sourceFont,'isocp.shx');assert.equal(dimensionParts(restored)[0].text,'min 200');
+ assert.deepEqual(dimensionParts(restored)[0].point,{x:-50,y:-30});
+});
+test('editing measurement grips invalidates native picture and recalculates placeholders without mutating source',()=>{
+ const e=importDXF(dxf(dim,tables,picture)).document.entities[0],before=structuredClone(e);
+ const changed=gripEntity(e,{kind:'point',i:1},{x:400,y:0});
+ assert.equal(dimensionParts(changed).find(p=>p.type==='text').text,'min 400');
+ assert.equal(dimensionParts(changed).find(p=>p.type==='text').height,60);
+ assert.deepEqual(e,before);
+ const scaledLabel=dimensionParts({...changed,measurementScale:2,precision:2,zeroSuppress:8,decimalSeparator:','}).find(p=>p.type==='text');assert.equal(scaledLabel.text,'min 800');
+ const chain=dimensionChain({...e,dimensionTextPoint:{x:-50,y:-30}},[e.points[0],e.points[1],{x:400,y:0}],e.points[2],e.axis);
+ assert.equal(chain.dimensionTextPoint,undefined);assert.equal(chain.dimensionGraphics,undefined);
+ const labels=dimensionParts(chain).filter(p=>p.type==='text');assert.equal(labels.length,2);assert.notDeepEqual(labels[0].point,labels[1].point);
+});
+test('suppressed dimensions with a picture containing no text still export and roundtrip',()=>{
+ const blocks=[0,'BLOCK',2,'*D1',10,0,20,0,0,'LINE',8,'0',10,0,20,-30,11,200,21,-30,0,'ENDBLK'];
+ const record=dim.slice();record[record.indexOf('min <>')]=' ';
+ const doc=importDXF(dxf(record,tables,blocks)).document;
+ assert.ok(!dimensionParts(doc.entities[0]).some(p=>p.type==='text'));
+ const roundtrip=importDXF(toDXF(doc)).document;assert.equal(roundtrip.entities[0].text,' ');assert.ok(validDocument(roundtrip));
+});
+const hatch={id:'h',type:'hatch',layer:'0',points:[{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}],holes:[[{x:4,y:4},{x:6,y:4},{x:6,y:6},{x:4,y:6}]],spacing:4,patternAngle:0,patternName:'CUSTOM',hatchPattern:[{angle:0,base:{x:1,y:2},offset:{x:3,y:4},dashes:[2,-2,0,-1]},{angle:Math.PI/2,base:{x:2,y:1},offset:{x:-4,y:3},dashes:[]}]};
+const docOf=e=>({version:1,layers:[{id:'0',name:'0',color:'#000000',lineType:'CONTINUOUS'}],entities:[e]});
+test('hatch keeps multiple line families, row phase, dash gaps, dots and holes through DXF and SVG',()=>{
+ const segments=hatchSegments(hatch);
+ assert.ok(segments.some(([a,b])=>a.x===1&&a.y===2&&b.x===3&&b.y===2));
+ assert.ok(segments.some(([a,b])=>a.x===4&&a.y===6&&b.x===6&&b.y===6));
+ assert.ok(segments.some(([a,b])=>a.x===b.x&&a.y===b.y));
+ const result=importDXF(toDXF(docOf(hatch)));assert.equal(result.count,1);assert.equal(result.document.entities[0].patternName,'CUSTOM');
+ assert.deepEqual(result.document.entities[0].hatchPattern,hatch.hatchPattern);assert.deepEqual(result.document.entities[0].holes,hatch.holes);
+ const svg=layoutSVG(docOf({...hatch,space:'paper',lineType:'DASHED'}),{id:'paper',name:'Hatch',width:20,height:20});assert.match(svg,/clip-rule="evenodd"/);assert.match(svg,/M 1 2 L 3 2/);assert.doesNotMatch(svg,/stroke-dasharray/);
+});
+test('hatch patterns follow move, rotation, reflection, uniform/nonuniform scale and density controls',()=>{
+ const moved=transformed(hatch,'MOVE',{x:0,y:0},{x:100,y:200});assert.deepEqual(moved.hatchPattern[0].base,{x:101,y:202});assert.deepEqual(moved.hatchPattern[0].offset,{x:3,y:4});
+ const scaled=transformed(hatch,'SCALE',{x:0,y:0},null,2);assert.deepEqual(scaled.hatchPattern[0].dashes,[4,-4,0,-2]);assert.equal(scaled.spacing,8);
+ const mirrored=transformed(hatch,'MIRROR',{x:0,y:0},{x:1,y:0});assert.deepEqual(mirrored.hatchPattern[0].base,{x:1,y:-2});assert.deepEqual(mirrored.hatchPattern[0].offset,{x:3,y:-4});
+ const affine=affineEntity(hatch,2,3,0,{x:0,y:0});assert.deepEqual(affine.hatchPattern[0].offset,{x:6,y:12});assert.equal(affine.spacing,12);assert.deepEqual(affine.hatchPattern[0].dashes,[4,-4,0,-2]);
+ const adjusted=hatchPattern({...hatch,spacing:8,patternAngle:Math.PI/2});assert.ok(Math.abs(adjusted[0].offset.x+8)<1e-8);assert.ok(Math.abs(adjusted[0].offset.y-6)<1e-8);assert.deepEqual(adjusted[0].dashes,[4,-4,0,-2]);
+});
+test('malformed graphics and hatch metadata are rejected and dense/empty dash generation stays bounded',()=>{
+ const doc=docOf(hatch);assert.ok(validDocument(doc));
+ assert.equal(validDocument(docOf({...hatch,hatchPattern:[{...hatch.hatchPattern[0],dashes:[NaN]}]})),false);
+ const e=importDXF(dxf(dim,tables,picture)).document.entities[0];assert.equal(validDocument(docOf({...e,dimensionGraphics:[{...e,type:'dimension'}]})),false);
+ const dense={...hatch,hatchPattern:[{angle:0,base:{x:0,y:0},offset:{x:0,y:.0001},dashes:[.001,-.001]}]};assert.ok(hatchSegments(dense,{limit:100}).length<=100);
+ assert.equal(hatchSegments({...hatch,hatchPattern:[{...hatch.hatchPattern[0],dashes:[-1,-1]}]}).length,0);
+ assert.ok(hatchSegments({...hatch,hatchPattern:[{...hatch.hatchPattern[0],dashes:[0]}]}).every(([a,b])=>a.x===b.x && a.y===b.y));
+ assert.equal(hatchSegments({...hatch,spacing:1e-9,hatchPattern:[{angle:0,base:{x:0,y:1e11},offset:{x:0,y:1e-9},dashes:[]}]}).length,0);
+});

@@ -14,11 +14,11 @@ import {
 import { blockParts } from "./blocks.js";
 import { polylineParts, hasBulges } from "./polyline.js";
 import { dimensionParts } from "./dimensions.js";
-import { textLines } from "./text.js";
+import { textLayout } from "./text.js";
 
 // Derived geometry for drawing, selection and snapping. Never changes entities.
 export function pointsOf(e) {
-  if (e.type === "block") return blockParts(e).flatMap(pointsOf);
+  if (e.type === "block") return blockParts(e).filter(p => !p.hidden).flatMap(pointsOf);
   if (hasBulges(e)) return polylineParts(e).flatMap(pointsOf);
   if (e.type === "dimension") return dimensionParts(e).flatMap(pointsOf);
   if (e.type === "viewport") {
@@ -36,19 +36,17 @@ export function pointsOf(e) {
     );
   }
   if (e.type === "text") {
-    const lines = textLines(e.text),
-      w = Math.max(1, ...lines.map((s) => s.length)) * e.height * 0.65,
-      h = e.height,
-      bottom = -(lines.length - 1) * h * 1.4;
+    const layout = textLayout(e), x = layout.x * layout.fit, w = layout.width;
+    const skew = Math.tan(e.oblique || 0) * (layout.bottom - layout.top);
     return [
-      { x: 0, y: bottom },
-      { x: w, y: bottom },
-      { x: w, y: h },
-      { x: 0, y: h },
+      { x: x - Math.abs(skew), y: -layout.bottom },
+      { x: x + w + Math.abs(skew), y: -layout.bottom },
+      { x: x + w + Math.abs(skew), y: -layout.top },
+      { x: x - Math.abs(skew), y: -layout.top },
     ].map((p) =>
       add(e.point, {
-        x: p.x * Math.cos(e.rotation || 0) - p.y * Math.sin(e.rotation || 0),
-        y: p.x * Math.sin(e.rotation || 0) + p.y * Math.cos(e.rotation || 0),
+        x: p.x * (e.textMirrorX ? -1 : 1) * Math.cos(e.rotation || 0) - p.y * (e.textMirrorY ? -1 : 1) * Math.sin(e.rotation || 0),
+        y: p.x * (e.textMirrorX ? -1 : 1) * Math.sin(e.rotation || 0) + p.y * (e.textMirrorY ? -1 : 1) * Math.cos(e.rotation || 0),
       }),
     );
   }
@@ -77,7 +75,7 @@ export function bounds(e) {
       maxY: Math.max(...bs.map((b) => b.maxY)),
     };
   }
-  let p = e.type === "circle" || e.type === "arc" ? [] : pointsOf(e);
+  let p = e.type === "circle" || e.type === "arc" ? [] : e.type === "hatch" ? [e.points, ...(e.holes || [])].flat() : pointsOf(e);
   if (e.type === "circle")
     p = [
       sub(e.center, { x: e.radius, y: e.radius }),
@@ -137,8 +135,10 @@ export function hitDistance(e, p) {
       e.type === "text" ||
       e.type === "viewport" ||
       e.closed;
-  if ((e.type === "hatch" || e.type === "text") && inside(p, pts)) return 0;
+  if (e.type === "text" && inside(p, pts)) return 0;
+  if (e.type === "hatch" && [pts, ...(e.holes || [])].reduce((contains, loop) => inside(p, loop) ? !contains : contains, false)) return 0;
   let d = Infinity;
+  for (const loop of e.holes || []) for (let i = 0; i < loop.length; i++) d = Math.min(d, segmentDistance(p, loop[i], loop[(i + 1) % loop.length]));
   for (let i = 1; i < pts.length; i++)
     d = Math.min(d, segmentDistance(p, pts[i - 1], pts[i]));
   if (closed && pts.length)

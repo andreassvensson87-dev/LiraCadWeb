@@ -168,3 +168,12 @@ test("viewport corner resizing crops without moving the model on paper", async (
     }
   }
 });
+
+test('text width grips respect rotation, mirroring and all three horizontal anchors',()=>{
+ for(const textAlign of ['left','center','right'])for(const textMirrorX of [false,true]){
+  const e={type:'text',point:{x:10,y:20},height:2,text:'A B C',textAlign,textMirrorX,rotation:Math.PI/2,textWidth:10};
+  const g=grips(e).find(g=>g.kind==='textWidth');const same=gripEntity(e,g,g.p);assert.ok(Math.abs(same.textWidth-10)<1e-8);
+  const factor=textAlign==='center'?0.5:textAlign==='right'?-1:1, x=20*factor*(textMirrorX?-1:1);
+  const wider=gripEntity(e,g,{x:10,y:20+x});assert.ok(Math.abs(wider.textWidth-20)<1e-8);assert.deepEqual(wider.point,e.point);assert.equal(e.textWidth,10);
+ }
+});

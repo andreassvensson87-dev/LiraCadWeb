@@ -56,7 +56,7 @@ Flytta, kopiera, rotera, skala och spegla fungerar för flerval. Spegla ersätte
 
 Modulär JavaScript utan byggberoenden. Ren geometri, objektoperationer, dokumentvalidering, transaktioner, kommandon, presentation och filformat har egna moduler. `src/core.js` är en kompatibilitetsfasad. `src/app.js` kopplar ihop modulerna och innehåller ännu viss interaktion/UI. Se [arkitekturen](docs/architecture.md) för ansvar och regler för vidareutveckling. Denna första utgåva använder Canvas 2D och omritning vid ändringar via requestAnimationFrame. Stora produktionsritningar är ännu inte prestandaverifierade; nästa rendering/indexering väljs efter mätningar. Historiken sparar dokumentkopior, begränsade till 80 transaktioner, och behöver effektiviseras för stora filer.
 
-Desktop med mus/tangentbord är målplattform. Hatch är en enkel polygon med parallella linjer; hål och komplexa mönster saknas. Textmått i markering är approximativa. Specialfonter, dynamiska block och 3D ingår inte. Måttobjekt och paperspace finns nu, med begränsningar nedan. Systemfonter används om de valfria webbfonderna inte kan laddas.
+Desktop med mus/tangentbord är målplattform. Hatch stöder polygoner, hål och importerade linjemönster med flera riktningar och streck/gap. Textmått använder samma layout som visningen (approximation utan tillgängliga originaltypsnitt). SHX-tolkning, AutoCADs dynamiska blockfunktioner och generell 3D ingår inte. LiraCAD har egna stretchparametrar för block, se nedan. Måttobjekt och paperspace finns nu, med begränsningar nedan.
 
 ## Kontroll
 
@@ -73,7 +73,34 @@ Ritytan har inga fasta överlägg. Rutnät är avstängt som standard och kan v�
 
 Dubbelklicka på ett Text-objekt eller en Leader för att öppna texteditorn på ritytan. TEXT/T och MTEXT/MT öppnar samma editor efter vald insättningspunkt. Enter ger ny rad; Ctrl/⌘+Enter eller Klar sparar hela ändringen som ett ångringssteg. Escape/Avbryt återställer. Klick utanför editorn bekräftar ändringen. Inspectorn visar texthöjd, typsnitt och blockformatering. Textinnehållet redigeras på canvasen.
 
-Fetstil, kursiv, understrykning och Arial/Georgia/Courier New gäller hela blocket. Formatering per ord, färgspann, tabeller, automatisk radbrytning efter spaltbredd och avancerad MTEXT-layout ingår inte ännu. Editorn visas horisontellt under redigering; objektets rotation bevaras i ritningen.
+Fetstil, kursiv, understrykning och Arial/Georgia/Courier New gäller hela blocket. Importerad MTEXT bevarar grundläggande formatering per spann, färger, spaltbredd, radbrytning, radavstånd och nio fästpunkter. Texteditorn ändrar formatering för hela blocket; ändrat textinnehåll ersätter spannformateringen. Tabeller, flera spalter, avancerade stycken och staplade bråk förenklas fortfarande. Editorn visas horisontellt under redigering; objektets rotation bevaras i ritningen.
+
+Texteditorn och egenskapspanelen har vänster/centrerad/höger justering,
+lodrät fästpunkt och rotation,
+radavstånd med Minst/Exakt, teckenavstånd, breddfaktor och textbredd för automatisk
+radbrytning (0 = ingen begränsning). Radavstånd 1× betyder CAD-standard, cirka
+1,67 gånger texthöjden; intervallet är 0,25–4×. Teckenavstånd 1× är normalt,
+0,75× tätare och upp till 4× glesare. Breddfaktorn ändrar själva tecknens bredd.
+Vänster/centrerad/höger ändrar både fästpunktens horisontella justering och
+radjusteringen. Övriga spannfärger och stilar bevaras när avstånd ändras.
+Justeringarna följer med i projektfiler och MTEXT-export. Native ATTRIB/ATTDEF
+saknar MTEXT-teckenavstånd; för sådan export bevaras teckenavstånd bara i projektfilen.
+
+Textinnehåll och formatering förhandsvisas direkt på ritytan medan editorn är
+öppen. Förhandsvisningen ersätter originalet tillfälligt och ändrar inte
+projektet eller ångringshistoriken. Klar sparar allt som ett steg; Avbryt
+återställer originalet. Editorn placeras bredvid texten när det finns plats.
+Markerad vanlig text har ett grepp på insättningspunkten och ett på textbredden;
+breddgreppet följer rotation, spegling och vänster/centrerad/höger fästpunkt.
+
+Dubbelklicka på ett synligt attribut inne i en namnruta, eller markera blocket
+och välj **Textutseende · attributnamn**, för att ändra dess text och formatering.
+Små attribut får automatiskt en närmare vy av namnrutan vid redigering utanför
+en aktiv modellviewport. Texteditorn placeras bredvid namnrutan när det finns plats.
+Ändringen sparas som ett attributundantag för just den blockinstansen. Andra
+namnrutor och blockdefinitionen behåller sitt utseende. Tomma attributvärden kan
+sparas; attribut behöver fortfarande en enda textrad. Typsnitt, texthöjd,
+breddfaktor och justering följer med i ATTRIB-export.
 
 Enkel oformaterad rad exporteras som TEXT. Flerradig eller formaterad text exporteras som MTEXT med styckebrytningar och DXF-formateringskoder. Exporten använder UTF-8 för svenska tecken. MTEXT-formatet beskrivs i [Autodesks DXF-referens](https://help.autodesk.com/cloudhelp/2023/ENU/AutoCAD-DXF/files/GUID-5E5DB93B-F8D3-4433-ADF7-E92E250D2BAB.htm).
 
@@ -90,6 +117,17 @@ Polylinjer med bågsegment/bulges stöds; se beskrivningen nedan. Fillet/Chamfer
 
 ## Måttsättning
 
+Arkinspectorn har A1–A4, utskriftsfärg (färg/svartvitt för SVG) och
+`Återställ tomma vyer`. Funktionen ger endast tomma vyer en modellöversikt med
+en standardiserad skala som rymmer modellen, i ett ångringssteg. Den återskapar
+inte originalets detaljutsnitt och ändrar inte skaltexter/skalstockar på arket.
+Viewportinspectorn har standardskalor, fri skala, rotation och modellcentrum.
+SVG-exportens linjetjocklekar anges i fysiska mm oberoende av viewportskalan.
+Lagrets DXF-flagga för utskrift bevaras och kan ändras med `Skriv ut` i lagerpanelen.
+Lager som inte skrivs ut är fortfarande synliga för redigering; en viewport på
+ett sådant lager visar fortfarande sitt modellinnehåll i exporten.
+Svartvitt sparas i projektet och används i SVG; DXF-export skapar ingen CTB-fil.
+
 `DLI` linjärt, `DAL` riktat, `DAN` vinkel, `DRA` radie och `DDI` diameter finns också som knappar under Måttsätt. För DLI/DAL klickar du två eller fler mätpunkter, trycker Enter och placerar sedan hela måttlinjen. Kedjan sparas som ett objekt: val, flytt, rotation, skala och stil gäller hela kedjan. Greppet på måttlinjen flyttar dess placering; mätpunkternas grepp ändrar angränsande delmått. DAL använder de två första punkterna för kedjans gemensamma riktning. Vinkelmått använder spets, två riktningspunkter och placering. Radie/diameter använder en vald cirkel/båge och textplacering. DLI väljer horisontell/vertikal riktning efter placeringen.
 
 Mått sparas som egna redigerbara projektobjekt med greppunkter, texthöjd, precision och, för enskilda mått, valfri textöverskrivning. Måttet räknas om när dess grepp ändras. **Mått är inte associativt kopplade till andra objekts geometri. DXF-exporten skriver native DIMENSION med måttstil och visningsblock.**
@@ -98,9 +136,14 @@ Mått sparas som egna redigerbara projektobjekt med greppunkter, texthöjd, prec
 
 Välj **+ Layout** för A3, byt A3/A4 och orientering i inspectorn. Layouter kan döpas om och tas bort (ångra stöds). **+ Viewport / MV** skapar en rektangulär modellvy med två hörn. Markera ramen för att ändra skala, låsa vyn eller aktivera den. Flera viewports och layouter stöds.
 
+**Anpassa vy till modell** i den markerade viewportens egenskaper passar in
+synlig modellgeometri med en liten marginal. Pappersram och vyrotation behålls;
+vycentrum och skala ändras som ett ångrbart steg. Detta visar tillgänglig geometri
+när en importerad vy är tom, men återskapar inte ett okänt originalutsnitt.
+
 Samma rit- och redigeringskommandon fungerar i Model och på papper. I papper är en enhet en millimeter på arket; inne i en aktiverad viewport är det modellens millimeter. Dubbelklicka inuti viewporten eller välj Aktivera modellvy för modellredigering. **Till papper** eller `PSPACE` återgår till arket. `MODEL` växlar till modellfliken. Låst vy blockerar panorering/zoom men inte redigering. Lås upp för att ändra vycentrum och skala med mus/styrplatta. Viewportramar kan flyttas, skalas och ändras med grips, men är alltid rektangulära och kan inte roteras/speglas.
 
-Projektfil/autosparning bevarar papper, skala, låsning, modellvy och objektens utrymme. DXF-export skriver LAYOUT, pappersblock och native VIEWPORT. Även sekundära layouter bevaras. **Exportera ark** ger en SVG med fysiska millimetermått och klippta modellvyer; viewportramar skrivs inte ut. Ingen PDF-skrivardialog är integrerad ännu. Snap mot modellgeometri görs inne i aktiv viewport, inte från pappersläget genom en inaktiv viewport. Modellens lager delas av alla vyer; per-viewport lagerfrysning återstår.
+Projektfil/autosparning bevarar papper, skala, låsning, modellvy och objektens utrymme. DXF-export skriver LAYOUT, pappersblock och native VIEWPORT. Även sekundära layouter bevaras. **Exportera ark** ger en SVG med fysiska millimetermått och klippta modellvyer; viewportramar skrivs inte ut. Ingen PDF-skrivardialog är integrerad ännu. Snap mot modellgeometri görs inne i aktiv viewport, inte från pappersläget genom en inaktiv viewport. Modellens lager delas av alla vyer; importerade frysta lager respekteras per viewport.
 
 Referenser för export: [LAYOUT](https://help.autodesk.com/cloudhelp/2018/ENU/AutoCAD-DXF/files/GUID-433D25BF-655D-4697-834E-C666EDFD956D.htm) och [VIEWPORT](https://help.autodesk.com/cloudhelp/2016/ENU/AutoCAD-DXF/files/GUID-2602B0FB-02E4-4B9A-B03C-B1D904753D34.htm).
 
@@ -157,15 +200,54 @@ Manifest, ikoner och offlinecache ingår i produktionsbygget. Appadressen och
 installationen behålls. Offline fungerar efter första lyckade cacheinstallationen.
 Webbläsarens lagring kan rensas och ersätter inte projektbackuper.
 
+Installerad LiraCAD i Microsoft Edge eller Google Chrome registrerar stöd för
+`.dwg` och `.dxf` i Windows. Installera den aktuella versionen från appens vanliga
+adress. Välj sedan LiraCAD för varje filtyp under **Inställningar → Appar →
+Standardappar**, eller via filens **Öppna med** och välj att alltid använda appen.
+Windows bestämmer standardvalet; webbappen ändrar det inte automatiskt.
+Dubbelklick öppnar filen lokalt i en ny projektflik, även när appen redan körs.
+Flera filer köas. Under blockredigering bevaras filerna tills **Öppna väntande
+filer** används efter avslutad redigering. Befintliga projekt finns kvar.
+Instruktionerna finns också under appens **Inställningar**.
+
+Filassociationerna kräver en installerad app i en webbläsare som stöder File
+Handling API. En vanlig webbläsarflik registreras inte som Windows-standardapp.
+Stödet och kön är testade med simulerade kalla/varma OS-starter i Chromium;
+Windows Utforskarens riktiga standardappsval måste verifieras på Windows.
+[Microsofts dokumentation](https://learn.microsoft.com/en-us/microsoft-edge/progressive-web-apps/how-to/handle-files).
+
 ## Block, attribut och bågpolylinjer
 
 - **BLOCK / B:** markera objekt, ange ett unikt blocknamn och välj baspunkt. **INSERT / I:** ange blocknamnet och välj insättningspunkt. Knappar finns under Redigera. Definitionerna bevaras i projektet även om sista instansen raderas. Kopiera, flytta, rotera, skala, spegla, snap och insättningsgrepp fungerar. **X / EXPLODE** delar upp blocket igen.
-- **ATTDEF / ATT:** markera en enkelradig text och ange ett attributnamn (A–Z, 0–9, _). Ta med texten när blocket skapas. Varje infogat block har egna värden som ändras i inspektorn. Nya instanser får definitionens standardvärden. BEDIT finns; se blockeditorn nedan. Nästlade/dynamiska block och multiline-attribut ingår inte i denna första version.
+- **ATTDEF / ATT:** markera en enkelradig text och ange ett attributnamn (A–Z, 0–9, _). Ta med texten när blocket skapas. Varje infogat block har egna värden som ändras i inspektorn. Nya instanser får definitionens standardvärden. BEDIT finns; se blockeditorn nedan. Nästlade block, AutoCADs dynamiska blockfunktioner och multiline-attribut ingår inte i denna första version.
 - **PL / PLINE:** välj startpunkt och fortsätt med raka segment. **A** växlar till båge via en mellanpunkt och en slutpunkt. **L** återgår till linje, **U** ångrar senaste segment/mellanpunkt, **C** sluter med en rak kant och Enter avslutar. Bågens mittgrepp ändrar krökningen. JOIN kan sammanfoga linjer, bågar och öppna polylinjer; EXPLODE ger tillbaka linjer och bågar. Bågsegment lagras som DXF-bulge, inte som korta raka linjer.
 - OFFSET, TRIM/EXTEND och lägg till/ta bort hörn stöder ännu inte bågpolylinjer som redigeringsmål; kommandot säger till. Dela upp med X först. Bågpolylinjer fungerar som trimgränser.
 - DXF-export skriver BLOCK/INSERT, ATTDEF/ATTRIB, LWPOLYLINE med bulge och riktiga DIMENSION-objekt med DIMSTYLE och anonyma visningsblock. Måttkedjor blir separata redigerbara delmått i DXF. Måtten är ännu inte associativt kopplade till den måttsatta geometrin. Export har kontrollerats med ezdxf; öppning/regenerering i AutoCAD behöver också provas med riktiga filer.
 
 DXF-referenser: [INSERT](https://help.autodesk.com/cloudhelp/2021/ENU/AutoCAD-DXF/files/GUID-28FA4CFB-9D5E-4880-9F11-36C97578252F.htm), [LWPOLYLINE](https://help.autodesk.com/cloudhelp/2015/ENU/AutoCAD-DXF/files/GUID-748FC305-F3F2-4F74-825A-61F04D757A50.htm), [DIMENSION](https://help.autodesk.com/cloudhelp/2023/ENU/AutoCAD-DXF/files/GUID-239A1BDD-7459-4BB9-8DD7-08EC79BF1EB0.htm).
+
+### WBLOCK · separata mallfiler
+`WBLOCK` (`WB`) eller **Exportera mall · DXF** under Ändra skriver en separat
+DXF-fil. Källritningens objekt, blockdefinitioner och ångrahistorik behålls.
+
+- **O / Enter: markerade objekt.** Markera först eller välj objekt i ritytan
+  och tryck Enter. Ange filnamn och välj en baspunkt genom klick eller
+  koordinater. Enter väljer 0,0. Baspunkten blir mallfilens origo.
+- **B: blockdefinition.** Ange ett befintligt blocknamn och filnamn.
+  Definitionens eget origo och grundgeometri används. Definitioner kan
+  exporteras även om inga instanser finns kvar i ritningen.
+
+Exporten innehåller bara valda objekt och deras nödvändiga lager, med lager 0
+som blockens fallback. Geometrin hamnar i modellutrymmet, enheten är millimeter
+och insättningsbasen är 0,0. Viewport-ramar exporteras inte med WBLOCK.
+En vald blockinstans behåller aktuell längd, rotation, skala, spegling och
+attributvärden. Blockdefinitionens attribut exporteras som ATTDEF med sina
+standardvärden. LiraCADs stretchparametrar följer inte med som dynamiska
+blockfunktioner i DXF; den aktuella formen bevaras.
+
+Detta är DXF-export för återanvändbara mallar, exempelvis till LiraStructure.
+DWG-skrivning finns ännu inte. Öppning och exportens struktur är verifierade
+i LiraCAD; mallfilens användning i LiraStructure behöver provas där.
 
 ### Blockeditor
 Dubbelklicka på ett block eller markera det och kör `BEDIT` (`BE`). Blocket
@@ -179,7 +261,47 @@ attributnamnet ändras på samma textobjekt). Nya attribut får standardvärdet.
 Baspunkten blir definitionens nya origo; instansernas insättningspunkter ligger
 kvar. `BCANCEL` eller **Avbryt blockredigering** kastar utkastet. Den sparade
 ändringen kan ångras som ett steg i huvudritningen. Blockutkast autosparas inte;
-webbläsaren varnar om du lämnar sidan. Nästlade och dynamiska block stöds inte.
+webbläsaren varnar om du lämnar sidan. Nästlade block och AutoCADs dynamiska
+blockfunktioner stöds inte.
+
+### STRETCH och smarta block
+`STRETCH` (`S`) använder en sträckruta: dra rutan eller ange dess två hörn,
+välj en baspunkt och ange målpunkten, exempelvis `@200,0`. Ändpunkter och hörn
+i rutan flyttas; helt inneslutna objekt flyttas i sin helhet. Linjer,
+polylinjer, hatch-hål, bågändpunkter och måttpunkter kan sträckas. En delvis
+innesluten cirkel sträcks inte. Text och block flyttas om insättningspunkten
+ligger i rutan. Viewport-ramar ingår inte. Förhandsvisningen ändrar inte
+ritningen och hela ändringen kan ångras i ett steg.
+
+I `BEDIT`, välj **Lägg till stretchparameter** eller kör `BSTRETCH` (`BSP`).
+Ange ett namn, exempelvis Bredd, välj längdaxelns fasta start och slutpunkt
+och en sträckruta runt den rörliga änden. Spara blocket. Varje instans får
+ett eget längdvärde i Egenskaper och ett grepp vid längdaxelns slut. Greppet
+projicerar rörelsen på axeln och fungerar även efter rotation, skalning och
+spegling. Värdet anges i blockets lokala millimeter. Exempelvis kan en
+fönsterkarm behålla sin tjocklek medan bredden ändras. Högst 20 parametrar
+per definition stöds; parametrar tas bort i blockeditorn.
+
+**Visa stretch · namn** visar parameterns längdaxel, sträckruta och berörda
+punkter. Gröna punkter hör till objekt som flyttas i sin helhet; orange
+punkter sträcks. I parameterpanelen kan namn, axelkoordinater och rutans
+gränser ändras. **Välj längdaxel i ritningen** och **Välj sträckruta i
+ritningen** låter dig ange nya punkter genom klick, drag eller koordinater.
+Ändring av sträckrutan räknar om vilka delar som påverkas.
+
+**Minsta längd**, **Största längd** och **Längdsteg** styr både grepp och
+inmatade värden. Steg 0 ger fri längd. Stegen utgår från grundlängden:
+grundlängd 1000 och steg 100 ger exempelvis 900, 1000, 1100. Värden
+avrundas till närmaste tillåtna steg inom gränserna. Grundlängden måste
+ligga inom gränserna. När blocket sparas anpassas befintliga instansvärden
+till nya gränser och steg; sparningen kan ångras som ett steg.
+Separata parametrar för bredd och höjd kan påverka samma hörn och behålla
+en karms tjocklek i båda riktningarna.
+
+Parametrar och instansvärden bevaras i projektfilen och autosparningen.
+DXF-export bevarar den aktuella formen som vanliga block. LiraCADs
+parametrar följer inte med som AutoCADs dynamiska blockåtgärder, och
+återimport av DXF ger därför statiska block.
 
 ### Attributfält i inspektorn
 Markerade block visar sina attribut överst i inspektorn: fritext, dropdown eller
@@ -209,14 +331,53 @@ lokalt i en web worker. Importen ersätter den aktuella ritningen och kan ångra
 En rapport visar objekt som hoppats över och kända förenklingar.
 
 Stöd: LINE, CIRCLE, ARC, 2D LWPOLYLINE/POLYLINE inklusive bulge, TEXT/MTEXT,
-vanliga INSERT/ATTDEF/ATTRIB, fem måtttyper, raka LEADER, enkla polygonhatch,
-layouter och oroterade rektangulära viewports. Lager och ACI/true color läses.
+vanliga INSERT/ATTDEF/ATTRIB, fem måtttyper, raka LEADER och textbaserade MULTILEADER,
+solida hatch och hatch med flera gränser/hål, layouter och roterade rektangulära
+viewports. Ellipser och kontrollpunktsbaserade rationala splines approximeras till
+redigerbara polylinjer med måltolerans 0,001 ritningsenhet och begränsad segmentbudget.
+Planar polyface-mesh bevarar synliga kanter. Lager, ACI/true color, enkla native
+linjemönster, linjetypsskala och linjevikt läses. ACI 7 visas som ljus text i modell
+och mörk text på papper; explicit true-color vitt förblir vitt.
 Blockens dropdown-definitioner är LiraCAD-projektdata och finns inte i DXF.
 
-Begränsningar: binär DXF, splines, 3D, blockmatriser,
-olikformig blockskala, solid hatch och hatch med hål/kurvor saknar stöd.
-Textjustering/rik formatering och måttutseende kan avvika. Egna linjemönster
-ersätts med appens mönster. Koordinater behålls utan enhetsomräkning; andra
+TEXT bevarar justering, breddfaktor, lutning och spegling. MTEXT bevarar
+fästpunkt, bredd, radavstånd och grundläggande spannformatering. TTF/OTF-fontnamn
+bevaras och används om typsnittet finns lokalt; ISO-fonter får det medföljande
+osifont (LiraCAD ISO) som reserv före Arial Narrow/Arial. ISOC P/ISOC T-familjerna
+matchas uttryckligen; andra SHX-fonter använder fortsatt en generell reserv.
+Typsnittet laddas innan text mäts och fungerar offline efter installation.
+SVG-export bäddar in ISO-reserven så att den kan visas även på en annan dator.
+LiraCAD ISO kan också väljas i texteditorn. Det är en approximation av originalets
+ISO-font, ingen SHX-tolk. Källa och licens finns i `src/vendor/fonts/osifont/`.
+SHX visas med en ersättningsfont men originalnamnet bevaras för
+DXF-export. Attribut accepterar svenska tecken, siffror, punkt och bindestreck.
+ATTRIB-position och storlek bevaras per blockinstans; osynliga attribut förblir
+osynliga. Plan spegling med normal −Z stöds. Olikformigt skalade block plattas ut
+till redigerbar geometri. Måtttyper utanför appens fem native typer bevaras som
+geometri från måttblocket när det finns.
+
+Pappersobjekt räknas om till bladets fysiska mm med utskriftsskala, tum/mm,
+fönsterursprung och utskriftsförskjutning. En A1-layout som skrivs i halv skala
+på A3 ryms därför på A3 även i appen. Modellkoordinater och viewportens målpunkt
+bevaras. DXF-exporten skriver den normaliserade layouten i skala 1:1.
+Sparade viewportvyer som ligger utanför tillgänglig synlig modellgeometri
+rapporteras; importen flyttar inte vyerna till en gissad position.
+
+Begränsningar: binär DXF, generell 3D, blockmatriser, rasterbilder/OLE, komplexa
+linjetyper med text/SHX och klippta/perspektiviska viewports saknar stöd.
+Importerade mått behåller sitt anonyma visningsblock som grafik inom måttobjektet.
+Flytt/rotation/spegling bevarar grafiken. Skala räknar om värdet och bevarar
+grafiken när textmallen kan matchas; annars återskapas måttet. Ändrade mätpunkter, text eller stil
+återskapar måttet från dess mätpunkter; avancerade pilformer/textplacering kan då
+avvika. DIMSTYLE och ACAD/DSTYLE-överstyrningar läses för höjd, pilstorlek,
+hjälplinjernas avstånd, textgap, decimaler, måttfaktor, prefix/suffix och font.
+Textmallen `min <>` räknas om med det aktuella värdet; en ensam blank döljer texten.
+Hatch bevarar linjefamiljernas vinkel, baspunkt, offset, streck/gap och punkter,
+inklusive BTG/INSUL2 och användardefinierade mönster. Samma geometri används för
+canvas och SVG och skrivs tillbaka till DXF. Vinkel/täthet ändrar hela mönstret.
+Vid utzoomning glesas skärmens linjer under 0,8 px; generering begränsas till
+30 000 segment per hatch. Alternativa ö-lägen och gradienter är inte fullt stödda.
+Avancerade MTEXT-stycken, tabeller och staplade bråk förenklas. Modellkoordinater behålls utan enhetsomräkning; andra
 ritningsenheter än mm rapporteras. Kontrollera mått innan praktisk användning.
 
 ### DWG-import (första versionen)
@@ -228,9 +389,55 @@ Nästlade block förenklas till geometri i den yttre blockdefinitionen; dynamisk
 funktioner bevaras inte. Specialobjekt kan saknas helt och rapporteras vid import.
 Spara som LiraCAD-projekt eller exportera DXF. DWG-export ingår inte.
 
+Annotativa blockskalvarianter läses ur objektens kontextordböcker, även i
+nästlade block. Layoutvisning och SVG-export använder viewportens separata
+annotationsskala, inte dess utskriftsskala. Frysta viewportlager respekteras.
+Viewportens inspector har **Annotationsskala 1:** och **Visa övriga skalvarianter**.
+När originalets ANNOALLVISIBLE saknas visas ej matchande objekt med sin sparade
+grundgeometri och importen rapporterar detta. Aktiverad viewport använder samma
+skalvariant för målning, markering, grepp, snäppning och texteditor.
+Välj text eller mått i modellvyn och använd **Skapa variant för 1:…** för manuell
+justering. Placering, textstorlek och utseende sparas per annotationsskala;
+textinnehåll och måttets mätpunkter är gemensamma. Ångra/redo bevarar varianterna.
+Blockeditorn ändrar den gemensamma grunddefinitionen; attributens texteditor
+kan ändra den aktiva skalvarianten. COPY bevarar varianterna och flyttar dem alla.
+Importerbara TEXT/MTEXT-kontexter kräver läsbar placering och explicit standard-
+kontext för beräkning av texthöjd. Måttkontexter kräver ett läsbart måttblock och
+standardkontext. DWG-läsaren är utökad med TEXT- och MTEXT-kontextklasser och
+den ombyggda runtime ingår i appen. Autodesks offentliga övnings-DWG verifierar
+fem MTEXT-varianter i 1:24 och 1:48 genom verklig webbläsarimport och återimport.
+Wisconsin DOT:s utbildnings-DWG verifierar dessutom 23 TEXT- och 252 MTEXT-
+kontexter, varav 27 textobjekt används i importerad ritning. En kolumn stöds även
+när originalet har dynamisk kolumnmetadata. Fit/aligned TEXT, 3D-kontexter och
+MTEXT med oläsbar kolumnmetadata använder grundgeometrin med varning.
+Läsbar MTEXT bevarar flera kolumner, bredd, mellanrum, automatisk/manuell höjd,
+läsordning och explicita kolumnbrytningar. Samma layout används för canvas,
+markering och SVG. Egenskaperna kan justeras i inspektorn och bevaras i DXF.
+Originalets radbrytning kan fortfarande avvika med ersättningsfont.
+Native måttkontexter kopplas nu till skalans sparade måttblock, standardkontext,
+textplacering och måttlinje. ALDIM är verifierat mot 28 respektive 10 mått i de
+båda offentliga DWG-filerna. Läsare finns också för ANG/DMDIM/RADIM/RADIMLG/ORD,
+men deras binära svansfält saknar ännu oberoende DWG-verifiering; appens stödda
+måtttyper och läsbara block avgör vilka varianter som kan användas.
+Saknade text-/måttskalvarianter rekonstrueras inte från enbart en annotativ stil.
+Annotativa objekt utan läsbar kontext får en importvarning. Projektfiler bevarar
+skalinformationen; DXF bevarar den som LIRA_ANNOTATION-XData för återimport i
+LiraCAD. Detta är inte en export av AutoCADs fullständiga annotativa objektsystem.
+
 Den medföljande läsaren stöder DWG-format AC1014–AC1032. Alla filer och
 objekttyper är inte verifierade. Testad i webbläsaren med ACadSharps
-`sample_AC1032.dwg` (111 inlästa objekt, rapporterade avvikelser).
+`sample_AC1032.dwg` (ursprunglig kontroll: 111 inlästa objekt, rapporterade avvikelser).
+Importförbättringarna har dessutom verifierats lokalt med A-40-P-0200,
+A-40-P-0300, K20-G-D100, K20-G-S100 och Namnruta_A9: öppning i webbläsare,
+text/namnruta samt giltig DXF-export och återimport. Filerna är inte testfixtures
+i repositoryt. Externa DWG-referenser rapporteras med namn/sökväg och kräver
+tillhörande filer; appen hämtar dem inte automatiskt.
+
+Kodernas betydelse följer Autodesks referens för
+[TEXT](https://help.autodesk.com/cloudhelp/2023/ENU/AutoCAD-DXF/files/GUID-62E5383D-8A14-47B4-BFC4-35824CAE8363.htm),
+[MTEXT](https://help.autodesk.com/cloudhelp/2023/ENU/AutoCAD-DXF/files/GUID-5E5DB93B-F8D3-4433-ADF7-E92E250D2BAB.htm) och
+[VIEWPORT](https://help.autodesk.com/cloudhelp/2016/ENU/AutoCAD-DXF/files/GUID-2602B0FB-02E4-4B9A-B03C-B1D904753D34.htm) samt
+[PLOTSETTINGS](https://help.autodesk.com/cloudhelp/2025/ENU/AutoCAD-DXF/files/GUID-1113675E-AB07-4567-801A-310CDE0D56E9.htm).
 Runtimefilerna är cirka 27 MB och ingår i PWA-cachen för användning offline.
 Licenser och bygginstruktioner: `tools/DwgBridge/README.md`.
 

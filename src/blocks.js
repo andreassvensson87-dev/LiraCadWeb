@@ -1,10 +1,11 @@
+import { evaluatedBlockEntities, shiftParameters, parameterOffset, constrainedParameterValue } from "./parametric-blocks.js";
 import { clone, uid } from "./values.js";
 import { transform } from "./entity-transform.js";
 import { sub, add } from "./geometry.js";
 export const validBlockName = (s) =>
   typeof s === "string" && /^[\p{L}\p{N}_-]{1,64}$/u.test(s);
 export const validTag = (s) =>
-  typeof s === "string" && /^[A-Z_][A-Z0-9_]{0,63}$/.test(s);
+  typeof s === "string" && /^[\p{L}\p{N}_.-]{1,128}$/u.test(s);
 export function createBlock(entities, name, base, layer, space = "model") {
   if (!validBlockName(name))
     throw Error("Blocknamn: använd bokstäver, siffror, _ eller - (max 64).");
@@ -49,7 +50,7 @@ export function blockParts(e) {
   const r = e.rotation || 0,
     k = e.scale || 1,
     flip = e.mirrored ? -1 : 1;
-  return e.definition.entities.map((part) => {
+  return evaluatedBlockEntities(e).map((part) => {
     const n = transform(
       part,
       (p) =>
@@ -62,10 +63,28 @@ export function blockParts(e) {
     if (n.attributeTag) n.text = e.values?.[n.attributeTag] ?? n.text;
     n.space = e.space;
     n.id = e.id;
-    if (e.color) n.color = e.color;
+    if (part.inheritLayer) n.layer = e.layer;
+    if (e.color && (part.colorByBlock || part.inheritLayer && !part.color || part.inheritLayer == null && !part.color)) { n.color = e.color; n.cadColor7 = e.cadColor7; }
+    if (part.lineTypeByBlock) { n.lineType = e.lineType || "BYLAYER"; n.linePattern = e.linePattern; n.linePatternType = e.linePatternType; }
     if (e.lineType && e.lineType !== "BYLAYER") n.lineType = e.lineType;
     return n;
   });
+}
+// Text edits happen in world coordinates, but overrides belong to one block
+// instance in block coordinates. The definition and other instances stay intact.
+export function withAttributeText(block, tag, text) {
+  const definition = block.definition.entities.find(p => p.attributeTag === tag);
+  if (!definition || text.type !== "text" || text.attributeTag !== tag) throw Error("Blockattributet finns inte längre.");
+  const source = block.attributeOverrides?.[tag] || definition;
+  const r = block.rotation || 0, k = block.scale || 1, flip = block.mirrored ? -1 : 1;
+  const local = transform(text, p => {
+    const dx = p.x - block.point.x, dy = p.y - block.point.y;
+    return { x: (Math.cos(r) * dx + Math.sin(r) * dy) / k, y: flip * (-Math.sin(r) * dx + Math.cos(r) * dy) / k };
+  }, { scale: 1 / k, rotation: block.mirrored ? r : -r, mirror: !!block.mirrored });
+  local.point=sub(local.point,parameterOffset(block,definition.id));
+  Object.assign(local, { id: definition.id, layer: source.layer, color: source.color, cadColor7: source.cadColor7 });
+  delete local.space;
+  return { ...block, values: { ...block.values, [tag]: text.text }, attributeOverrides: { ...block.attributeOverrides, [tag]: local } };
 }
 export function insertBlock(template, point, layer, space) {
   return {
@@ -77,6 +96,8 @@ export function insertBlock(template, point, layer, space) {
     rotation: 0,
     scale: 1,
     mirrored: false,
+    attributeOverrides: {},
+    parameterValues: {},
     values: Object.fromEntries(
       template.definition.entities
         .filter((e) => e.attributeTag)
@@ -125,6 +146,7 @@ export function updateBlockDefinition(document, id, draft) {
     draft.layers[0].id,
   ).definition;
   definition.id = id;
+  if (draft.stretchParameters?.length) definition.stretchParameters=shiftParameters(draft.stretchParameters,base);
   const result = clone(document);
   result.layers = clone(draft.layers);
   result.blocks = blockTemplates(document).map((e) =>
@@ -150,7 +172,7 @@ export function updateBlockDefinition(document, id, draft) {
           ];
         }),
     );
-    return { ...e, definition: clone(definition), values };
+    return { ...e, definition: clone(definition), values, attributeOverrides: {}, parameterValues:Object.fromEntries(Object.entries(e.parameterValues||{}).filter(([id])=>definition.stretchParameters?.some(p=>p.id===id)).map(([id,value])=>[id,constrainedParameterValue(definition.stretchParameters.find(p=>p.id===id),value)])) };
   });
   return result;
 }

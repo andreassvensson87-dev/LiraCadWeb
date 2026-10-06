@@ -9,6 +9,12 @@ export function polylineParts(e) {
         b = e.points[(i + 1) % e.points.length],
         bulge = e.bulges?.[i] || 0;
       const common = {
+        hidden: e.hidden,
+        cadColor7: e.cadColor7,
+        lineWeight: e.lineWeight,
+        linePattern: e.linePattern,
+        linePatternType: e.linePatternType,
+        lineScale: e.lineScale,
         id: e.id,
         layer: e.layer,
         color: e.color,

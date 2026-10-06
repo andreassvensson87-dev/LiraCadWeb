@@ -6,5 +6,8 @@
     <PublishTrimmed>false</PublishTrimmed>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
-  <ItemGroup><PackageReference Include="ACadSharp" Version="3.8.0" /></ItemGroup>
+  <ItemGroup>
+    <Compile Remove="vendor/**/*.cs;AnnotationContexts/**/*.cs" />
+    <ProjectReference Include="vendor/ACadSharp/src/ACadSharp/ACadSharp.Lira.csproj" />
+  </ItemGroup>
 </Project>

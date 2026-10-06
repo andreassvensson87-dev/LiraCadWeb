@@ -1,3 +1,12 @@
+import { readTextColumns } from "./text-columns.js";
+import { readAnnotations } from "./dxf-annotation.js";
+import { polylineParts } from "./polyline.js";
+import { splinePoints, ellipsePoints, affineEntity } from "./dxf-curves.js";
+import { hatchLoops, readHatchPattern } from "./dxf-hatch.js";
+import { dimensionGraphicsState, dimensionParts } from "./dimensions.js";
+import { usesIsoFont } from "./cad-fonts.js";
+import { mleaderParts } from "./dxf-mleader.js";
+import { cadFont, parseMtext } from "./dxf-text.js";
 import { aciColors } from "./dxf-colors.js";
 import { uid } from "./values.js";
 import { validDocument } from "./document.js";
@@ -5,6 +14,7 @@ import { transform } from "./entity-transform.js";
 import { sub, add, mul } from "./geometry.js";
 import { blockParts, validBlockName, validTag } from "./blocks.js";
 import { lineTypes, validLineType } from "./linetypes.js";
+import { bounds } from "./entity-geometry.js";
 const get = (r, c, f = "") => r.find((p) => p[0] === c)?.[1] ?? f;
 const all = (r, c) => r.filter((p) => p[0] === c).map((p) => p[1]);
 const num = (r, c, f = 0) => Number(get(r, c, f));
@@ -96,6 +106,7 @@ export function importDXF(text, name = "Importerad ritning") {
     );
   const issues = new Map();
   const warn = (message) => issues.set(message, (issues.get(message) || 0) + 1);
+  const annotations = readAnnotations(sections, warn);
   const doc = {
     version: 1,
     name: name.replace(/\.dxf$/i, ""),
@@ -106,13 +117,21 @@ export function importDXF(text, name = "Importerad ritning") {
   };
   const tables = sections.get("TABLES") || [],
     objects = sections.get("OBJECTS") || [];
+  const headerPairs = (sections.get("HEADER") || []).flat();
+  const scaleIndex = headerPairs.findIndex(([c, v]) => c === 9 && v === "$LTSCALE");
+  const globalLineScale = scaleIndex < 0 ? 1 : Number(headerPairs[scaleIndex + 1]?.[1]) || 1;
+  const nativePatterns = new Map(tables.filter(r => get(r, 0) === "LTYPE" && !r.some(([c,v]) => c === 74 && Number(v) !== 0)).map(r => [get(r, 2).toUpperCase(), all(r, 49).map(Number)]));
+  const nativeLine = r => {
+    const name = get(r, 6, "BYLAYER").toUpperCase();
+    const pattern = ["BYLAYER", "BYBLOCK"].includes(name) ? undefined : nativePatterns.get(name);
+    return { ...(pattern ? { linePattern: pattern.map(v => v * globalLineScale), linePatternType: lt(r) } : {}), lineScale: num(r, 48, 1) };
+  };
   const color = (r) => {
     if (get(r, 420) !== "")
       return "#" + num(r, 420).toString(16).padStart(6, "0").slice(-6);
     const index = Math.abs(num(r, 62, 256));
     if (index === 256) return undefined;
     if (index === 0) {
-      warn("Färg BYBLOCK tolkades som Enligt lager");
       return undefined;
     }
     if (index === 7) return "#ffffff";
@@ -122,18 +141,27 @@ export function importDXF(text, name = "Importerad ritning") {
   };
   const lt = (r) => {
     const value = get(r, 6, "BYLAYER").toUpperCase();
+    if (value === "BYBLOCK") return "BYLAYER";
     if (validLineType(value)) return value;
+    const pattern = nativePatterns.get(value);
+    if (pattern) {
+      if (!pattern.length) return "CONTINUOUS";
+      if (pattern.filter(v => v >= 0).length > 1) return "CENTER";
+      if (pattern.some(v => v === 0)) return "DOTTED";
+      return "DASHED";
+    }
     warn(`Linjetyp ${value} ersattes med Enligt lager`);
     return "BYLAYER";
   };
-  for (const r of tables.filter((r) => get(r, 0) === "LTYPE")) {
-    const name = get(r, 2).toUpperCase(),
-      known = lineTypes.find(([id]) => id === name);
-    if (
-      known &&
-      JSON.stringify(all(r, 49).map(Number)) !== JSON.stringify(known[2])
-    )
-      warn(`Linjemönster ${name} ersattes med appens standardmönster`);
+  const textStyles = new Map(tables.filter(r => get(r, 0) === "STYLE").map(r => [get(r, 2).toUpperCase(), r]));
+  function textStyle(r) {
+    const style = textStyles.get(get(r, 7, "STANDARD").toUpperCase()) || tables.find(s => get(s, 0) === "STYLE" && get(s, 5) === get(r, 7)) || [];
+    const file = get(style, 3, "Arial");
+    const shx = /\.shx$/i.test(file) || /^(txt|simplex|romans|helv_mag)$/i.test(file);
+    const fallback = /iso/i.test(file) ? "Arial Narrow" : "Arial";
+    if (shx) warn(`SHX-typsnitt ${file} använder ${usesIsoFont({sourceFont:file})?'LiraCAD ISO':fallback} som reserv; originalnamnet bevaras`);
+    else if (!/^arial(\.ttf)?$/i.test(file)) warn(`Typsnitt ${cadFont(file)} bevarat; ersättningsfont används om det inte finns lokalt`);
+    return { font: shx ? fallback : cadFont(file), sourceFont: file, widthFactor: num(style, 41, 1), oblique: rad(num(style, 50)) };
   }
   const layerMap = new Map();
   function layer(name) {
@@ -158,12 +186,17 @@ export function importDXF(text, name = "Importerad ritning") {
       color: color(r) || "#ffffff",
       visible: num(r, 62, 7) >= 0 && !(num(r, 70) & 1),
       locked: !!(num(r, 70) & 4),
+      plot:!!num(r,290,get(r,2).toUpperCase()==='DEFPOINTS'?0:1),
+      cadColor7:get(r,420)==='' && Math.abs(num(r,62,7))===7,
+      ...nativeLine(r),
+      ...(num(r, 370, -1) >= 0 ? { lineWeight: num(r, 370) / 100 } : {}),
       lineType: lt(r) === "BYLAYER" ? "CONTINUOUS" : lt(r),
     });
   }
   if (!doc.layers.length) layer("0");
   const spaceMap = new Map(),
-    ownerSpace = new Map();
+    ownerSpace = new Map(),
+    paperTransforms = new Map();
   function space(name) {
     if (!name || name.toLowerCase() === "model") return "model";
     if (!spaceMap.has(name)) {
@@ -182,6 +215,16 @@ export function importDXF(text, name = "Importerad ritning") {
     if (num(r, 44) > 0 && num(r, 45) > 0) {
       l.width = num(r, 44);
       l.height = num(r, 45);
+      if (num(r, 73) % 2) [l.width, l.height] = [l.height, l.width];
+      // Our paper coordinates are physical mm. Native layouts can draw on A1
+      // and plot at 1:2 on A3; scale only paper entities, never model geometry.
+      const numerator = num(r, 142, 1), denominator = num(r, 143, 1);
+      const factor = num(r, 70) & 16 ? num(r, 147, numerator / denominator) : numerator / denominator;
+      const scale = factor * (num(r, 72, 1) === 0 ? 25.4 : 1);
+      if (Number.isFinite(scale) && scale > 0 && num(r, 72, 1) !== 2) {
+        const window = num(r, 74) === 4;
+        paperTransforms.set(id, { scale, x: num(r, 46) + num(r, 40) - (window ? num(r, 48) * scale : 0), y: num(r, 47) + num(r, 41) - (window ? num(r, 49) * scale : 0) });
+      } else warn(`Layout ${name}: utskriftsskalan kunde inte läsas; papperskoordinater behölls`);
     } else warn("Pappersformat saknades; A3 användes");
     ownerSpace.set(all(r, 330).at(-1), id);
   }
@@ -202,6 +245,7 @@ export function importDXF(text, name = "Importerad ritning") {
   function definition(name) {
     if (definitions.has(name)) return definitions.get(name);
     const b = blocks.get(name);
+    if (b && num(b.header, 70) & 12) warn(`Extern referens ${name} (${get(b.header, 1)}) behöver tillhörande DWG-fil; laddas inte automatiskt`);
     if (!b) throw Error(`Blockdefinition ${name} saknas`);
     if (building.has(name)) throw Error("Cirkulära blockreferenser stöds inte");
     if (building.size >= 20) throw Error("För många nivåer av nästlade block");
@@ -236,8 +280,31 @@ export function importDXF(text, name = "Importerad ritning") {
   }
   function convert(r, inBlock) {
     const type = get(r, 0);
-    if (["SEQEND", "VERTEX", "ATTRIB"].includes(type)) return null;
-    if (num(r, 210) !== 0 || num(r, 220) !== 0 || num(r, 230, 1) !== 1)
+    if (["SEQEND", "VERTEX"].includes(type)) return null;
+    const common = {
+      id: uid(),
+      ...annotations(r),
+      layer: layer(get(r, 8, "0")),
+      color: color(r),
+      cadColor7: get(r, 420) === "" && Math.abs(num(r, 62, 256)) === 7,
+      colorByBlock: get(r, 420) === "" && num(r, 62, 256) === 0,
+      lineTypeByBlock: get(r, 6).toUpperCase() === "BYBLOCK",
+      ...(inBlock ? { inheritLayer: get(r, 8, "0") === "0" } : {}),
+      lineType: lt(r),
+      ...nativeLine(r),
+      ...(num(r, 370, -1) >= 0 ? { lineWeight: num(r, 370) / 100 } : {}),
+      space: inBlock
+        ? "model"
+        : get(r, 410)
+          ? space(get(r, 410))
+          : ownerSpace.get(get(r, 330)) ||
+            (num(r, 67) ? space("Layout 1") : "model"),
+    };
+    if (type === "MULTILEADER" || type === "MLEADER") {
+      warn("MULTILEADER importerades som redigerbara hänvisningar och separat text");
+      return mleaderParts(r, text => ({ ...convert(text, inBlock), layer: common.layer, space: common.space, color: common.color }), common).map(e => ({ ...e, id: uid() }));
+    }
+    if (Math.abs(num(r, 210)) > 1e-8 || Math.abs(num(r, 220)) > 1e-8 || Math.abs(Math.abs(num(r, 230, 1)) - 1) > 1e-8)
       throw Error("Annan objektplan än XY stöds inte");
     if (
       r.some(
@@ -246,21 +313,8 @@ export function importDXF(text, name = "Importerad ritning") {
       )
     )
       throw Error("3D/elevation/tjocklek stöds inte");
-    const common = {
-      id: uid(),
-      layer: layer(get(r, 8, "0")),
-      color: color(r),
-      lineType: lt(r),
-      space: inBlock
-        ? "model"
-        : get(r, 410)
-          ? space(get(r, 410))
-          : ownerSpace.get(get(r, 330)) ||
-            (num(r, 67) ? space("Layout 1") : "model"),
-    };
-    if (num(r, 60)) warn("Osynligt objekt importerades synligt");
-    if (num(r,48,1)!==1) warn("Objektets linjetypsskala stöds inte");
-    if (num(r,370,-1)>=0) warn("Objektets linjevikt stöds inte");
+    if (num(r, 60)) common.hidden = true;
+
     if (type === "LINE")
       return { ...common, type: "line", points: [pt(r), pt(r, 11)] };
     if (type === "CIRCLE" || type === "ARC") {
@@ -281,8 +335,34 @@ export function importDXF(text, name = "Importerad ritning") {
           : {}),
       };
     }
+    if (type === "ELLIPSE") {
+      warn("Ellips approximerades med polyline (tolerans 0,001 ritningsenhet)");
+      const start = num(r, 41), end = num(r, 42, Math.PI * 2);
+      return { ...common, type: "polyline", points: ellipsePoints(pt(r), pt(r, 11), num(r, 40), start, end, num(r, 230, 1) < 0 ? -1 : 1), closed: Math.abs(end - start - Math.PI * 2) < 1e-8 };
+    }
+    if (type === "SPLINE") {
+      warn("Spline approximerades med polyline (tolerans 0,001 ritningsenhet)");
+      return { ...common, type: "polyline", points: splinePoints(vertices(r), all(r, 40).map(Number), num(r, 71), all(r, 41).map(Number)), closed: !!(num(r, 70) & 1) };
+    }
+    if (type === "SOLID" || type === "TRACE") {
+      const points = [pt(r), pt(r, 11), pt(r, 13), pt(r, 12)];
+      if (points[2].x === points[3].x && points[2].y === points[3].y) points.splice(2, 1);
+      return { ...common, type: "hatch", points, solid: true, spacing: 10 };
+    }
     if (type === "LWPOLYLINE" || type === "POLYLINE") {
-      if (type === "POLYLINE" && num(r, 70) & (8 | 16 | 64))
+      if (type === "POLYLINE" && (num(r, 70) & 64)) {
+        const vertices = r.children.filter(v => num(v, 70) & 64);
+        if (vertices.some(v => Math.abs(num(v, 30)) > 1e-8)) throw Error("3D-mesh stöds inte");
+        const result = [];
+        for (const face of r.children.filter(v => !(num(v, 70) & 64))) {
+          const indices = [71, 72, 73, 74].map(c => num(face, c)).filter(Boolean);
+          if (indices.length < 3 || indices.some(i => !vertices[Math.abs(i) - 1])) throw Error("Ogiltiga mesh-index");
+          for (let i = 0; i < indices.length; i++) if (indices[i] > 0) result.push({ ...common, id: uid(), type: "line", points: [pt(vertices[indices[i] - 1]), pt(vertices[Math.abs(indices[(i + 1) % indices.length]) - 1])] });
+        }
+        warn("Planar polyface-mesh importerades som synliga kanter");
+        return result;
+      }
+      if (type === "POLYLINE" && num(r, 70) & (8 | 16))
         throw Error("3D-polyline/mesh stöds inte");
       if (type === "POLYLINE" && r.children.some((v) => num(v, 30) !== 0))
         throw Error("3D-vertex stöds inte");
@@ -297,54 +377,48 @@ export function importDXF(text, name = "Importerad ritning") {
         closed: !!(num(r, 70) & 1),
       };
     }
-    if (["TEXT", "MTEXT", "ATTDEF"].includes(type)) {
-      let value = unicode(
-        type === "MTEXT" ? all(r, 3).join("") + get(r, 1) : get(r, 1),
-      );
-      let rotation = rad(num(r, 50)),
-        point = pt(r),
-        height = num(r, 40, 2.5);
+    if (["TEXT", "MTEXT", "ATTDEF", "ATTRIB"].includes(type)) {
+      const style = textStyle(r);
+      const raw = type === "MTEXT" ? all(r, 3).join("") + get(r, 1) : get(r, 1);
+      let value = type === "MTEXT" ? raw.replace(/%%d/gi, "°").replace(/%%p/gi, "±").replace(/%%c/gi, "Ø") : unicode(raw);
+      const e = { ...common, ...style, type: "text", text: value, point: pt(r), height: num(r, 40, 2.5), rotation: rad(num(r, 50)) };
       if (type === "MTEXT") {
-        rotation = num(r, 50);
-        if (get(r, 11) !== "") rotation = Math.atan2(num(r, 21), num(r, 11));
-        if (/\\[A-OQ-TV-Za-oq-tv-z]/.test(value) || /[{}]/.test(value))
-          warn("MTEXT-formattering förenklades");
-        value = value
-          .replace(/\\P/g, "\n")
-          .replace(/\\~/g, " ")
-          .replace(/\\[A-Za-z][^;]*;/g, "")
-          .replace(/\\[LlOoKk]/g, "")
-          .replace(/[{}]/g, "")
-          .replace(/\\\\/g, "\\");
-        point = {
-          x: point.x + Math.sin(rotation) * height,
-          y: point.y - Math.cos(rotation) * height,
-        };
-        if (num(r, 71, 1) !== 1 || num(r, 41) > 0)
-          warn("MTEXT-justering eller radbrytning kan avvika");
-      } else if (num(r, 72) || num(r, 73) || num(r, 74))
-        warn("Textjustering förenklades till vänster baslinje");
-      if (get(r, 7, "STANDARD") !== "STANDARD")
-        warn("Textstil ersattes med Arial");
-      if (num(r, 51) || (num(r, 41, 1) !== 1 && type !== "MTEXT"))
-        warn("Textens breddfaktor eller lutning förenklades");
-      const e = {
-        ...common,
-        type: "text",
-        text: value,
-        point,
-        height,
-        rotation,
-        font: "Arial",
-      };
-      if (type === "ATTDEF") {
-        const tag = get(r, 2).toUpperCase();
+        e.rotation = num(r, 50);
+        const directionIndex = r.findIndex(([c]) => c === 11), rotationIndex = r.findIndex(([c]) => c === 50);
+        if (directionIndex > rotationIndex) e.rotation = Math.atan2(num(r, 21), num(r, 11));
+        const parsed = parseMtext(value, { ...style, height: e.height });
+        e.text = parsed.text;
+        e.textRuns = parsed.runs.map(run => ({ ...run, ...(run.colorIndex === 7 ? { color: "#ffffff", cadColor7: true } : run.colorIndex != null && aciColors[run.colorIndex] ? { color: aciColors[run.colorIndex] } : {}) }));
+        if (parsed.simplified) warn("Avancerad MTEXT-formatering (t.ex. staplade bråk eller stycken) förenklades");
+        e.textAttachment = num(r, 71, 1);
+        e.textWidth = Math.max(0, num(r, 41));
+        e.lineSpacing = num(r, 44, 1) * 5 / 3;
+        e.lineSpacingStyle = num(r, 73, 1);
+        const columns = readTextColumns(r);
+        if (columns) e.textColumns = columns;
+        else if (num(r,75)>0 || r.some(p=>p[0]===101 && p[1]==='Embedded Object')) warn("MTEXT-kolumner saknar läsbar bredd eller antal; texten bevarades i en kolumn");
+      } else {
+        e.widthFactor = num(r, 41, style.widthFactor);
+        e.oblique = rad(num(r, 51, style.oblique * 180 / Math.PI));
+        const h = num(r, 72), v = num(r, type === "TEXT" ? 73 : 74);
+        e.textAlign = ["left", "center", "right"][h] || (h === 4 ? "center" : "left");
+        e.textVertical = ["baseline", "bottom", "middle", "top"][v] || "baseline";
+        if (h === 4) e.textVertical = "middle";
+        if ((h || v) && get(r, 11) !== "" && ![3, 5].includes(h)) e.point = pt(r, 11);
+        if ([3, 5].includes(h) && get(r, 11) !== "") {
+          const end = pt(r, 11); e.textFitWidth = Math.hypot(end.x - e.point.x, end.y - e.point.y);
+          e.rotation = Math.atan2(end.y - e.point.y, end.x - e.point.x);
+          if (h === 3) warn("TEXT Aligned: bredd bevarad; texthöjden kan avvika");
+        }
+        e.textMirrorX = !!(num(r, 71) & 2); e.textMirrorY = !!(num(r, 71) & 4);
+      }
+      if (type === "ATTDEF" || type === "ATTRIB") {
+        const tag = unicode(get(r, 2)).toUpperCase();
         if (!validTag(tag)) throw Error("Attributnamnet stöds inte");
         if (!(num(r, 70) & 2)) e.attributeTag = tag;
-        if (num(r, 70) & 1)
-          warn("Osynlig attributdefinition importerades synligt");
+        if (num(r, 70) & 1) e.hidden = true;
       }
-      return e;
+      return annotations.textVariants(r,e);
     }
     if (type === "INSERT") {
 
@@ -352,75 +426,124 @@ export function importDXF(text, name = "Importerad ritning") {
         throw Error("Blockmatriser stöds inte");
       const sx = num(r, 41, 1),
         sy = num(r, 42, 1);
-      if (sx <= 0 || Math.abs(Math.abs(sy) - sx) > 1e-8)
-        throw Error("Olikformig eller negativ X-skala på block stöds inte");
+      if (!sx || !sy) throw Error("Blockets skala är noll");
       const def = definition(get(r, 2));
+      if (Math.abs(Math.abs(sy) - Math.abs(sx)) > 1e-8) {
+        warn("Olikformigt skalat block förenklades till redigerbar geometri");
+        const annotationFallback=!!common.annotationContexts || def.entities.some(e=>e.annotationContexts?.length);
+        if(annotationFallback)warn("Olikformigt skalat annotativt block: grundgeometrin bevarades utan skalvarianter");
+        const geometry = def.entities.filter(e => !e.attributeTag).flatMap(e => e.type==='dimension'?dimensionParts(e):e.type === "polyline" && e.bulges?.some(Boolean) ? polylineParts(e) : [e]).map(e => ({ ...affineEntity(e, sx, sy, rad(num(r, 50)), pt(r)), id: uid(), space: common.space }));
+        for (const a of r.attributes || []) { const e = convert(a, inBlock); delete e.attributeTag; geometry.push(e); }
+        if(annotationFallback)for(const part of geometry){delete part.annotationContexts;delete part.annotationBase;part.annotative=true;}
+        return geometry;
+      }
+      const attributeOverrides = {};
       const values = Object.fromEntries(
         def.entities
           .filter((e) => e.attributeTag)
           .map((e) => [e.attributeTag, e.text]),
       );
       for (const a of r.attributes || []) {
-        const tag = get(a, 2).toUpperCase();
-        if (Object.hasOwn(values, tag)) values[tag] = unicode(get(a, 1));
+        const tag = unicode(get(a, 2)).toUpperCase();
+        if (Object.hasOwn(values, tag)) {
+          values[tag] = unicode(get(a, 1));
+          const angle = rad(num(r, 50)) + (sx < 0 ? Math.PI : 0), insertion = pt(r), flip = sx * sy < 0 ? -1 : 1, k = Math.abs(sx);
+          const attribute = convert(a, inBlock);
+          attributeOverrides[tag] = transform(attribute, p => {
+            const x = p.x - insertion.x, y = p.y - insertion.y;
+            return { x: (x * Math.cos(angle) + y * Math.sin(angle)) / k, y: flip * (-x * Math.sin(angle) + y * Math.cos(angle)) / k };
+          }, { scale: 1 / k, rotation: flip < 0 ? angle : -angle, mirror: flip < 0 });
+          delete attributeOverrides[tag].space;
+        }
         else warn("Attribut utan motsvarande definition utelämnades");
       }
       const instance = {
         ...common,
         type: "block",
         point: pt(r),
-        scale: sx,
-        mirrored: sy < 0,
-        rotation: rad(num(r, 50)),
+        scale: Math.abs(sx),
+        mirrored: sx * sy < 0,
+        rotation: rad(num(r, 50)) + (sx < 0 ? Math.PI : 0),
         definition: def,
         values,
+        attributeOverrides,
       };
       if (inBlock) {
         warn("Nästlat block förenklades till geometri; attribut blev text");
         return blockParts(instance).map(part => {
+          if(instance.annotationContexts){part.annotative=true;part.annotationContexts=structuredClone(instance.annotationContexts);part.annotationBase=structuredClone(instance.annotationBase);}
           part.id = uid(); delete part.attributeTag; delete part.attributeSchema; return part;
         });
       }
       return instance;
     }
     if (type === "DIMENSION") {
-      warn(
-        "Mått återskapades med appens måttstil; utseende och textplacering kan avvika",
-      );
       const kind = num(r, 70) & 7,
-        style = styles.get(get(r, 3)) || [],
-        height = num(style, 140, 2.5) * num(style, 40, 1);
+        style = new Map(styles.get(get(r, 3)) || []);
+      // ACAD/DSTYLE XData pairs override the named style for this dimension.
+      let application='',override=-1;
+      for(let i=0;i<r.length;i++){if(r[i][0]===1001)application=r[i][1];if(application==='ACAD' && r[i][0]===1000 && r[i][1]==='DSTYLE'){override=i;break;}}
+      if(override>=0)for(let i=override+1;i<r.length;i++){
+        if(r[i][0]===1002 && r[i][1]==='}')break;
+        if(r[i][0]===1070 && r[i+1] && [1040,1070,1000,1005].includes(r[i+1][0])){style.set(Number(r[i][1]),r[++i][1]);}
+      }
+      const styleValue=(code,fallback)=>Number(style.get(code)??fallback), scale=styleValue(40,1)||1;
+      const height=styleValue(140,2.5)*scale;
       const e = {
         ...common,
         type: "dimension",
         height,
-        precision: num(style, 271, 0),
+        ...textStyle([[7,style.get(340)||'STANDARD']]),
+        precision: Math.max(0,Math.min(6,styleValue(271,0))),
+        arrowSize:styleValue(41,2.5)*scale,extensionOffset:styleValue(42,0.625)*scale,
+        extensionOvershoot:styleValue(44,1.25)*scale,textGap:styleValue(147,0.625)*scale,
+        measurementScale:styleValue(144,1),dimensionPost:style.get(3)||'<>',
+        decimalSeparator:String.fromCharCode(styleValue(278,46)),zeroSuppress:styleValue(78,0),
+        ...(num(r,70)&128 && get(r,11)!=='' ? {dimensionTextPoint:pt(r,11)} : {}),
         text: get(r, 1) === "<>" ? "" : get(r, 1),
       };
+      const finish=dimension=>{
+        const name=get(r,2), block=blocks.get(name);
+        if(block)try{
+          const def=definition(name),base=pt(block.header);
+          const graphics=def.entities.flatMap(part=>part.type==='block'?blockParts(part):[part]).map(part=>({...transform(part,p=>add(p,base)),id:uid(),space:common.space}));
+          if(graphics.length && graphics.every(p=>!['block','dimension','viewport'].includes(p.type))){dimension.dimensionGraphics=graphics;dimension.dimensionGraphicsState=dimensionGraphicsState(dimension);}
+        }catch{warn('Måttblock kunde inte läsas; måttet återskapades från mätpunkter och måttstil');}
+        if(!dimension.dimensionGraphics)warn('Mått återskapades från mätpunkter och måttstil; avancerad placering/pilform kan avvika');
+        return annotations.dimensionVariants(r,dimension,name=>{
+          const block=blocks.get(name);if(!block)return null;
+          try{const def=definition(name),base=pt(block.header);return def.entities.flatMap(part=>part.type==='block'?blockParts(part):[part]).filter(part=>!['dimension','viewport'].includes(part.type)).map(part=>({...transform(part,p=>add(p,base)),id:uid(),space:common.space}));}catch{return null;}
+        },dimensionGraphicsState);
+      };
       if (kind === 0 || kind === 1)
-        return {
+        return finish({
           ...e,
           kind: kind === 0 ? "linear" : "aligned",
           points: [pt(r, 13), pt(r, 14), pt(r)],
           axis: { x: Math.cos(rad(num(r, 50))), y: Math.sin(rad(num(r, 50))) },
-        };
+        });
       if (kind === 4 || kind === 3) {
         const a = pt(r),
           b = pt(r, 15),
           center = kind === 3 ? mul(add(a, b), 0.5) : a;
-        return {
+        return finish({
           ...e,
           kind: kind === 3 ? "diameter" : "radius",
           points: [center, b, pt(r, 11)],
-        };
+        });
       }
       if (kind === 5)
-        return {
+        return finish({
           ...e,
           kind: "angular",
           points: [pt(r, 15), pt(r, 13), pt(r, 14), pt(r)],
-        };
-      throw Error("Denna måttyp stöds inte");
+        });
+      if (get(r, 2) && blocks.has(get(r, 2))) {
+        const name = get(r, 2), def = definition(name), base = pt(blocks.get(name).header);
+        warn("Denna måttyp importerades som redigerbar geometri från sitt måttblock");
+        return def.entities.map(part => ({ ...transform(part, p => add(p, base)), id: uid(), space: common.space }));
+      }
+      throw Error("Denna måttyp stöds inte och saknar måttblock");
     }
     if (type === "LEADER") {
       if (num(r, 72)) throw Error("Splineleader stöds inte");
@@ -434,35 +557,28 @@ export function importDXF(text, name = "Importerad ritning") {
       };
     }
     if (type === "HATCH") {
-      if (num(r, 91) !== 1 || !(num(r, 92) & 2) || num(r, 72))
-        throw Error("Hatch med hål eller kurvade gränser stöds inte");
-      if (num(r, 70)) throw Error("Solid hatch stöds inte");
-      const start = r.findIndex(([c]) => c === 93),
-        end = r.findIndex(([c], i) => i > start && c === 97);
-      const boundary = r.slice(start + 1, end < 0 ? undefined : end);
-      warn("Hatchmönstret förenklades till parallella linjer");
-      return {
-        ...common,
-        type: "hatch",
-        points: vertices(boundary).map(({ x, y }) => ({ x, y })),
-        spacing: Math.hypot(num(r, 45), num(r, 46)) || 10,
-        patternAngle: rad(num(r, 53, num(r, 52, 45))),
-      };
+      const loops = hatchLoops(r);
+      const pattern = num(r,70) ? null : readHatchPattern(r);
+      if (!num(r,70) && !pattern) warn("Hatch saknar linjedefinition; parallella reservlinjer användes");
+      const angle=pattern?.[0]?.angle ?? rad(num(r,52,45));
+      const offset=pattern?.[0]?.offset;
+      const spacing=offset ? Math.abs(-Math.sin(angle)*offset.x+Math.cos(angle)*offset.y) : 10;
+      if(num(r,75)) warn("Hatch med alternativ ö-hantering visas med jämn/udda fyllning");
+      return { ...common, type: "hatch", points: loops[0], holes: loops.slice(1), solid: !!num(r, 70), spacing: spacing || 10, patternAngle: angle, ...(pattern ? {hatchPattern:pattern,patternName:get(r,2)} : {}) };
     }
     if (type === "VIEWPORT") {
       if (num(r, 69) === 1) return null;
       if (common.space === "model") throw Error("Viewport utan layout");
       if (
-        num(r, 51) ||
-        num(r, 16) ||
-        num(r, 26) ||
-        num(r, 36, 1) !== 1 ||
+        Math.abs(num(r, 16)) > 1e-8 ||
+        Math.abs(num(r, 26)) > 1e-8 ||
+        Math.abs(num(r, 36, 1) - 1) > 1e-8 ||
+        (num(r, 90) & 1) ||
         get(r, 340)
       )
-        throw Error("Roterad, 3D- eller klippt viewport stöds inte");
-      const p = pt(r),
-        w = num(r, 40),
-        h = num(r, 41);
+        throw Error("3D-, perspektiv- eller klippt viewport stöds inte");
+      const p = pt(r), w = num(r, 40), h = num(r, 41), rotation = -rad(num(r, 51)), center = pt(r, 12), target = pt(r, 17);
+      const viewCenter = { x: target.x + Math.cos(rotation) * center.x - Math.sin(rotation) * center.y, y: target.y + Math.sin(rotation) * center.x + Math.cos(rotation) * center.y };
       return {
         ...common,
         type: "viewport",
@@ -470,7 +586,8 @@ export function importDXF(text, name = "Importerad ritning") {
           { x: p.x - w / 2, y: p.y - h / 2 },
           { x: p.x + w / 2, y: p.y + h / 2 },
         ],
-        viewCenter: pt(r, 12),
+        viewCenter,
+        viewRotation: rotation,
         viewScale: h / num(r, 45),
         locked: !!(num(r, 90) & 16384),
       };
@@ -493,9 +610,17 @@ export function importDXF(text, name = "Importerad ritning") {
           r.attributes.push(records[++i]);
       }
       try {
-        const e = convert(r, inBlock);
+        let e = convert(r, inBlock);
+        if (e && num(r, 230, 1) < 0 && ["INSERT", "TEXT", "ATTDEF", "ATTRIB", "CIRCLE", "ARC", "LWPOLYLINE", "POLYLINE", "HATCH", "SOLID", "TRACE"].includes(type)) {
+          const flip = entity => transform(entity, p => ({ x: -p.x, y: p.y }), { mirror: true, rotation: Math.PI });
+          e = Array.isArray(e) ? e.map(flip) : flip(e);
+        }
         if (e) {
           const entities = Array.isArray(e) ? e : [e];
+          for(const entity of entities)if(entity.annotationLayerNames){
+            const remap=(part,space=entity.space)=>{if(part.layer)part.layer=layer(part.layer);if(part.space)part.space=space;if(part.definition)part.definition.entities.forEach(p=>remap(p,"model"));if(part.dimensionGraphics)part.dimensionGraphics.forEach(p=>remap(p,space));if(part.attributeOverrides)Object.values(part.attributeOverrides).forEach(p=>remap(p,"model"));};
+            entity.annotationVariants?.forEach(v=>remap(v.entity));delete entity.annotationLayerNames;
+          }
           if (!validDocument({ ...doc, blocks: [], entities }))
             throw Error("Ogiltig geometri eller egenskaper");
           result.push(...entities);
@@ -525,6 +650,23 @@ export function importDXF(text, name = "Importerad ritning") {
       doc.entities.push(...read(records));
     }
   doc.blocks = [...definitions.values()];
+  doc.entities = doc.entities.map(e => {
+    const paper = paperTransforms.get(e.space);
+    if (!paper || (Math.abs(paper.scale - 1) < 1e-10 && !paper.x && !paper.y)) return e;
+    const n = transform(e, p => ({ x: p.x * paper.scale + paper.x, y: p.y * paper.scale + paper.y }), { scale: paper.scale });
+    if (e.type === "viewport") n.viewScale = e.viewScale * paper.scale;
+    return n;
+  });
+  const modelBounds = doc.entities.filter(e => (e.space || "model") === "model" && !e.hidden && doc.layers.find(l => l.id === e.layer)?.visible !== false).map(bounds);
+  for (const e of doc.entities.filter(e => e.type === "viewport")) {
+    const c = Math.cos(e.viewRotation || 0), s = Math.sin(e.viewRotation || 0);
+    const halfWidth = Math.abs(e.points[1].x - e.points[0].x) / (2 * e.viewScale), halfHeight = Math.abs(e.points[1].y - e.points[0].y) / (2 * e.viewScale);
+    const overlaps = modelBounds.some(b => {
+      const corners = [[b.minX, b.minY], [b.maxX, b.minY], [b.maxX, b.maxY], [b.minX, b.maxY]].map(([x, y]) => ({ x: c * (x - e.viewCenter.x) + s * (y - e.viewCenter.y), y: -s * (x - e.viewCenter.x) + c * (y - e.viewCenter.y) }));
+      return Math.min(...corners.map(p => p.x)) <= halfWidth && Math.max(...corners.map(p => p.x)) >= -halfWidth && Math.min(...corners.map(p => p.y)) <= halfHeight && Math.max(...corners.map(p => p.y)) >= -halfHeight;
+    });
+    if (!overlaps) warn(`Layout ${doc.layouts.find(l => l.id === e.space)?.name || ""}: viewportens sparade vy ligger utanför tillgänglig synlig modellgeometri; kontrollera originalritningens vy och externa referenser`);
+  }
   const header = (sections.get("HEADER") || []).flat();
   const unitsIndex = header.findIndex(([c, v]) => c === 9 && v === "$INSUNITS");
   const units = unitsIndex < 0 ? 0 : Number(header[unitsIndex + 1]?.[1]);

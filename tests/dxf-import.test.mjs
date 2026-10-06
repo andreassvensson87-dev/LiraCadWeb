@@ -52,7 +52,8 @@ test("own exported geometry, layers, bulges and text import as editable entities
   assert.equal(result.document.entities[1].bulges[0], 1);
   assert.equal(result.document.entities[2].text, "Åäö");
   assert.equal(result.document.entities[3].text, "Rad 1\nRad 2");
-  assert.equal(result.document.entities[3].point.y, 20);
+  assert.equal(result.document.entities[3].point.y, 23);
+  assert.equal(result.document.entities[3].textAttachment, 1);
 });
 test("blocks retain definition sharing and per-instance attributes", () => {
   const b = createBlock(

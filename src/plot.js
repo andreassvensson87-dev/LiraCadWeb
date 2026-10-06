@@ -1,10 +1,15 @@
+import { viewportEntities } from "./annotation-context.js";
+import { textLayout, textEmSize, fontFamily } from "./text.js";
+import { cadFontSvgStyle, usesIsoFont } from "./cad-fonts.js";
+import { hatchSegments } from "./hatch-pattern.js";
 import { linePattern } from "./linetypes.js";
 import { blockParts } from "./blocks.js";
 import { polylineParts, hasBulges } from "./polyline.js";
 import { dimensionParts } from "./dimensions.js";
 import { pointsOf } from "./entity-geometry.js";
 import { polar, angle } from "./geometry.js";
-import { spaceOf } from "./layout.js";
+import { spaceOf,viewportHasGeometry } from "./layout.js";
+import { paperColor,paperLineWeight } from "./plot-style.js";
 const escape = (s) =>
   String(s).replace(
     /[&<>"']/g,
@@ -20,23 +25,21 @@ const escape = (s) =>
 export function layoutSVG(doc, layout) {
   let serial = 0;
   const defs = [];
-  const entity = (e) => {
+  let isoFont = false;
+  const entity = (e,plotScale=1) => {
     const layer = doc.layers.find((l) => l.id === e.layer);
-    if (layer?.visible === false) return "";
-    if (e.type === "block") return blockParts(e).map(entity).join("");
-    if (hasBulges(e)) return polylineParts(e).map(entity).join("");
-    if (e.type === "dimension") return dimensionParts(e).map(entity).join("");
-    const color = e.color || "#253b31";
+    if (e.hidden || layer?.visible === false || layer?.plot===false) return "";
+    if (e.type === "block") return blockParts(e).map(p=>entity(p,plotScale)).join("");
+    if (hasBulges(e)) return polylineParts(e).map(p=>entity(p,plotScale)).join("");
+    if (e.type === "dimension") return dimensionParts(e).map(p=>entity(p,plotScale)).join("");
+    const color = paperColor(e,layer,layout.monochrome);
     const dash = linePattern(e, layer).map(Math.abs).join(" ");
-    const stroke = `${dash ? `stroke-dasharray="${dash}" ` : ""}stroke="${escape(color)}" stroke-width="0.2" vector-effect="non-scaling-stroke" fill="none"`;
-    if (e.type === "text")
-      return `<g transform="translate(${e.point.x} ${e.point.y}) rotate(${((e.rotation || 0) * 180) / Math.PI}) scale(1 -1)"><text fill="${escape(color)}" font-family="${escape(e.font || "Arial")}" font-size="${e.height}" font-weight="${e.bold ? "bold" : "normal"}" font-style="${e.italic ? "italic" : "normal"}" text-decoration="${e.underline ? "underline" : "none"}">${e.text
-        .split("\n")
-        .map(
-          (s, i) =>
-            `<tspan x="0" y="${i * e.height * 1.4}">${escape(s)}</tspan>`,
-        )
-        .join("")}</text></g>`;
+    const stroke = `${dash ? `stroke-dasharray="${dash}" ` : ""}stroke="${escape(color)}" stroke-width="${paperLineWeight(e,layer)/plotScale}" fill="none"`;
+    if (e.type === "text") {
+      const l = textLayout(e);
+      isoFont ||= l.lines.some(line => line.runs.some(usesIsoFont));
+      return `<g transform="translate(${e.point.x} ${e.point.y}) rotate(${((e.rotation || 0) * 180) / Math.PI}) scale(${l.fit * (e.textMirrorX ? -1 : 1)} ${e.textMirrorY ? 1 : -1})">${l.lines.flatMap(line => line.runs.map(run => `<text transform="translate(${l.x + line.x + run.x} ${l.y + line.y}) matrix(${run.widthFactor || 1} 0 ${-Math.tan(run.oblique || 0)} 1 0 0)" fill="${escape(paperColor({color:run.color||color,cadColor7:run.cadColor7},layer,layout.monochrome))}" font-family="${escape(fontFamily(run))}" font-size="${textEmSize(run, run.height)}" font-weight="${run.bold ? "bold" : "normal"}" font-style="${run.italic ? "italic" : "normal"}" text-decoration="${run.underline ? "underline" : "none"}" xml:space="preserve">${run.glyphs ? run.glyphs.map(g => `<tspan x="${g.x}">${escape(g.text)}</tspan>`).join("") : escape(run.text)}</text>`)).join("")}</g>`;
+    }
     if (e.type === "circle")
       return `<circle cx="${e.center.x}" cy="${e.center.y}" r="${e.radius}" ${stroke}/>`;
     if (e.type === "arc" && Math.abs(e.sweep) < Math.PI * 2 - 1e-8) {
@@ -48,10 +51,10 @@ export function layoutSVG(doc, layout) {
       const h = e.height || 120,
         a = e.points[0],
         r = angle(a, e.points[1]),
-        b = polar(a, h * 0.75, r - 0.32),
-        c = polar(a, h * 0.75, r + 0.32);
+        b = polar(a, (e.arrowSize ?? h * 0.75), r - 0.32),
+        c = polar(a, (e.arrowSize ?? h * 0.75), r + 0.32);
       return (
-        entity({ ...e, type: "polyline" }) +
+        entity({ ...e, type: "polyline" },plotScale) +
         entity({
           ...e,
           type: "text",
@@ -60,31 +63,28 @@ export function layoutSVG(doc, layout) {
             y: e.points.at(-1).y + (h * 7) / 24,
           },
           rotation: 0,
-        }) +
+        },plotScale) +
         `<path d="M ${a.x} ${a.y} L ${b.x} ${b.y} L ${c.x} ${c.y} Z" fill="${escape(color)}"/>`
       );
     }
     const pts = pointsOf(e);
     if (!pts.length) return "";
-    const path = `M ${pts.map((p) => `${p.x} ${p.y}`).join(" L ")}${e.closed || e.type === "hatch" ? " Z" : ""}`;
+    const path = (e.holes?.length ? [pts, ...e.holes] : [pts]).map(pts => `M ${pts.map((p) => `${p.x} ${p.y}`).join(" L ")}${e.closed || e.type === "hatch" ? " Z" : ""}`).join(" ");
     if (e.type === "hatch") {
-      const id = `h${serial++}`,
-        step = e.spacing;
-      defs.push(
-        `<pattern id="${id}" width="${step}" height="${step}" patternUnits="userSpaceOnUse" patternTransform="rotate(${((e.patternAngle ?? Math.PI / 4) * 180) / Math.PI})"><path d="M 0 0 H ${step}" ${stroke}/></pattern>`,
-      );
-      return `<path d="${path}" ${stroke.replace('fill="none"', `fill="url(#${id})"`)}/>`;
+      if (e.solid) return `<path d="${path}" fill="${escape(color)}" fill-rule="evenodd"/>`;
+      const id = `h${serial++}`;
+      defs.push(`<clipPath id="${id}"><path d="${path}" clip-rule="evenodd"/></clipPath>`);
+      const lines=hatchSegments(e).map(([a,b])=>`M ${a.x} ${a.y} L ${b.x} ${b.y}`).join(" ");
+      return `<path clip-path="url(#${id})" d="${lines}" ${stroke.replace(/stroke-dasharray="[^"]*" /,"")} stroke-linecap="round"/>`;
     }
     return `<path d="${path}" ${stroke}/>`;
   };
-  const model = doc.entities
-    .filter((e) => spaceOf(e) === "model")
-    .map(entity)
-    .join("");
+  const modelEntities = doc.entities
+    .filter((e) => spaceOf(e) === "model");
   const viewports = doc.entities
     .filter(
       (e) =>
-        e.type === "viewport" &&
+        e.type === "viewport" && !e.hidden &&
         spaceOf(e) === layout.id &&
         doc.layers.find((l) => l.id === e.layer)?.visible !== false,
     )
@@ -98,12 +98,12 @@ export function layoutSVG(doc, layout) {
       defs.push(
         `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></clipPath>`,
       );
-      return `<g clip-path="url(#${id})"><g transform="translate(${x + w / 2} ${y + h / 2}) scale(${v.viewScale}) translate(${-v.viewCenter.x} ${-v.viewCenter.y})">${model}</g></g>`;
+      return `<g clip-path="url(#${id})"><g transform="translate(${x + w / 2} ${y + h / 2}) scale(${v.viewScale}) rotate(${-(v.viewRotation || 0) * 180 / Math.PI}) translate(${-v.viewCenter.x} ${-v.viewCenter.y})">${viewportEntities(modelEntities,v,doc.layers).filter(e=>viewportHasGeometry(v,[e])).map(e=>entity(e,v.viewScale)).join("")}</g></g>`;
     })
     .join("");
   const paper = doc.entities
     .filter((e) => spaceOf(e) === layout.id && e.type !== "viewport")
-    .map(entity)
+    .map(e=>entity(e))
     .join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}mm" height="${layout.height}mm" viewBox="0 0 ${layout.width} ${layout.height}"><title>${escape(layout.name)}</title><defs>${defs.join("")}</defs><rect width="100%" height="100%" fill="white"/><g transform="translate(0 ${layout.height}) scale(1 -1)">${viewports}${paper}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}mm" height="${layout.height}mm" viewBox="0 0 ${layout.width} ${layout.height}"><title>${escape(layout.name)}</title><defs>${isoFont ? cadFontSvgStyle() : ""}${defs.join("")}</defs><rect width="100%" height="100%" fill="white"/><g transform="translate(0 ${layout.height}) scale(1 -1)">${viewports}${paper}</g></svg>`;
 }

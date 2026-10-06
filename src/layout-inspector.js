@@ -1,6 +1,6 @@
 import { spaceOf } from "./layout.js";
 
-export function createLayoutInspector({ field, choice, section, action, getDocument, commit, log, refresh, afterFormat, afterRemove }) {
+export function createLayoutInspector({ field, choice, section, action, getDocument, commit, log, refresh, afterFormat, afterRemove,recoverViews }) {
   return function render(root, layoutId) {
     const layout = getDocument().layouts?.find((l) => l.id === layoutId);
     if (!layout) return;
@@ -17,6 +17,8 @@ export function createLayoutInspector({ field, choice, section, action, getDocum
       });
     }, "text"));
     panel.append(choice("Format", `${layout.width}x${layout.height}`, [
+      ["841x594", "A1 liggande"], ["594x841", "A1 stående"],
+      ["594x420", "A2 liggande"], ["420x594", "A2 stående"],
       ["420x297", "A3 liggande"], ["297x420", "A3 stående"],
       ["297x210", "A4 liggande"], ["210x297", "A4 stående"],
     ], (value) => {
@@ -27,6 +29,8 @@ export function createLayoutInspector({ field, choice, section, action, getDocum
       });
       afterFormat();
     }));
+    panel.append(choice("Utskriftsfärg",!!layout.monochrome,[["false","Färg"],["true","Svartvitt"]],value=>commit("Utskriftsfärg",draft=>{draft.layouts.find(l=>l.id===layoutId).monochrome=value==='true';})));
+    if(recoverViews)panel.append(action("Återställ tomma vyer",()=>recoverViews(layoutId)));
     panel.append(action("Ta bort layout", () => {
       commit("Ta bort layout", (draft) => {
         draft.entities = draft.entities.filter((e) => spaceOf(e) !== layoutId);

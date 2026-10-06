@@ -7,3 +7,5 @@ artifacts/
 
 tools/**/bin/
 tools/**/obj/
+
+tools/DwgBridge/vendor/

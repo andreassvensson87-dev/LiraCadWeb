@@ -1,4 +1,8 @@
+import { evaluatedBlockEntities } from "./parametric-blocks.js";
+import { annotationMetadata } from "./dxf-annotation.js";
 import { add, mod } from "./geometry.js";
+import { nativeFontName } from "./cad-fonts.js";
+import { hatchPattern } from "./hatch-pattern.js";
 import { lineTypes } from "./linetypes.js";
 import {
   splitDimension,
@@ -8,13 +12,27 @@ import {
 import { dimensionParts } from "./dimensions.js";
 import { blockParts } from "./blocks.js";
 import { dxfLayouts } from "./dxf-layout.js";
-import { needsMtext, mtextContent, textChunks } from "./text.js";
+import { needsMtext, mtextContent, textChunks, textLayout, textAlignment } from "./text.js";
 
 export function toDXF(doc) {
   const customBlocks = [],
     definitions = new Map(),
     usedBlockNames = new Set(),
     styles = [];
+  const nativeLineTypes = new Map();
+  const lineTypeName = e => {
+    if (e.lineType === "BYLAYER" || !e.linePattern || e.linePatternType !== e.lineType) return e.lineType;
+    const key = JSON.stringify(e.linePattern);
+    if (!nativeLineTypes.has(key)) nativeLineTypes.set(key, { name: `LIRA_LINE_${nativeLineTypes.size + 1}`, pattern: e.linePattern });
+    return nativeLineTypes.get(key).name;
+  };
+  doc.layers.forEach(lineTypeName);
+  const textStyles = new Map();
+  const textStyleName = e => {
+    const font = e.sourceFont || nativeFontName(e.font || "Arial") + ".ttf";
+    if (!textStyles.has(font)) textStyles.set(font, `LIRA_TEXT_${textStyles.size + 1}`);
+    return textStyles.get(font);
+  };
   const prepare = (entities) =>
     entities.flatMap((e) => {
       if (e.type === "dimension")
@@ -25,22 +43,23 @@ export function toDXF(doc) {
             flags: 1,
             entities: dimensionParts(dim),
           });
-          let style = styles.find(
-            (s) =>
-              s.height === dim.height && s.precision === (dim.precision || 0),
-          );
+          const properties={height:dim.height,precision:dim.precision||0,fontStyle:textStyleName(dim)};
+          for(const key of ['arrowSize','extensionOffset','extensionOvershoot','textGap','measurementScale','dimensionPost','decimalSeparator','zeroSuppress'])properties[key]=dim[key];
+          const key=JSON.stringify(properties);
+          let style = styles.find(s=>s.key===key);
           if (!style) {
             style = {
               name: `LIRA_DIM_${styles.length + 1}`,
-              height: dim.height,
-              precision: dim.precision || 0,
+              ...properties,key,
             };
             styles.push(style);
           }
           return { ...dim, _dimBlock: blockName, _dimStyle: style.name };
         });
       if (e.type === "block") {
-        const key = JSON.stringify(e.definition);
+        for (const part of Object.values(e.attributeOverrides || {})) { textStyleName(part); lineTypeName(part); }
+        const definition=e.definition.stretchParameters?.length?{...e.definition,entities:evaluatedBlockEntities({...e,attributeOverrides:{}})}:e.definition;
+        const key = JSON.stringify(definition);
         if (!definitions.has(key)) {
           let blockName = e.definition.name;
           if (usedBlockNames.has(blockName.toLowerCase()))
@@ -50,11 +69,13 @@ export function toDXF(doc) {
           customBlocks.push({
             blockName,
             flags: e.definition.entities.some((p) => p.attributeTag) ? 2 : 0,
-            entities: prepare(e.definition.entities),
+            entities: prepare(definition.entities),
           });
         }
         return [{ ...e, _blockName: definitions.get(key) }];
       }
+      lineTypeName(e);
+      if (e.type === "text" || e.type === "leader") textStyleName(e);
       return [e];
     });
   doc = { ...doc, entities: prepare(doc.entities) };
@@ -77,6 +98,9 @@ export function toDXF(doc) {
   pair(1, "AC1021");
   pair(9, "$INSUNITS");
   pair(70, 4);
+  pair(9, "$INSBASE");
+  point({x:0,y:0});
+  pair(30, 0);
   pair(0, "ENDSEC");
   pair(0, "SECTION");
   pair(2, "TABLES");
@@ -86,11 +110,12 @@ export function toDXF(doc) {
   pair(5, lineTable);
   pair(330, "0");
   pair(100, "AcDbSymbolTable");
-  pair(70, lineTypes.length + 2);
+  pair(70, lineTypes.length + 2 + nativeLineTypes.size);
   for (const [id, label, pattern] of [
     ["BYLAYER", "ByLayer", []],
     ["BYBLOCK", "ByBlock", []],
     ...lineTypes,
+    ...[...nativeLineTypes.values()].map(({ name, pattern }) => [name, name, pattern]),
   ]) {
     pair(0, "LTYPE");
     pair(5, layouts.handle());
@@ -127,11 +152,25 @@ export function toDXF(doc) {
     pair(2, str(l.name));
     pair(70, l.locked ? 4 : 0);
     pair(62, l.visible === false ? -7 : 7);
-    pair(420, parseInt(l.color.slice(1), 16));
-    pair(6, l.lineType || "CONTINUOUS");
+    if(!(l.color.toLowerCase()==='#ffffff' && l.cadColor7!==false))pair(420, parseInt(l.color.slice(1), 16));
+    pair(6, lineTypeName(l) || "CONTINUOUS");
+    pair(290,l.plot===false?0:1);
+    if (l.lineWeight != null) pair(370, Math.round(l.lineWeight * 100));
   }
   pair(0, "ENDTAB");
-  if (styles.length) dimensionStyles(styles, pair, layouts.handle);
+  pair(0,"TABLE");pair(2,"APPID");pair(5,layouts.handle());pair(100,"AcDbSymbolTable");pair(70,1);
+  pair(0,"APPID");pair(5,layouts.handle());pair(100,"AcDbSymbolTableRecord");pair(100,"AcDbRegAppTableRecord");pair(2,"LIRA_ANNOTATION");pair(70,0);pair(0,"ENDTAB");
+  const textStyleHandles=new Map();
+  if (textStyles.size) {
+    pair(0, "TABLE"); pair(2, "STYLE"); pair(5, layouts.handle()); pair(330, 0); pair(100, "AcDbSymbolTable"); pair(70, textStyles.size);
+    for (const [font, name] of textStyles) {
+      const handle=layouts.handle();textStyleHandles.set(name,handle);
+      pair(0, "STYLE"); pair(5, handle); pair(100, "AcDbSymbolTableRecord"); pair(100, "AcDbTextStyleTableRecord");
+      pair(2, name); pair(70, 0); pair(40, 0); pair(41, 1); pair(50, 0); pair(71, 0); pair(42, 2.5); pair(3, str(font)); pair(4, "");
+    }
+    pair(0, "ENDTAB");
+  }
+  if (styles.length) dimensionStyles(styles, pair, layouts.handle,textStyleHandles);
   layouts.tables();
   pair(0, "ENDSEC");
   const blocksInsert = out.length;
@@ -151,8 +190,13 @@ export function toDXF(doc) {
         str(doc.layouts?.find((l) => l.id === e.space)?.name || "Layout1"),
       );
     }
-    if (e.lineType) pair(6, e.lineType);
-    if (e.color) pair(420, parseInt(e.color.slice(1), 16));
+    if (e.lineType) pair(6, lineTypeName(e));
+    if (e.lineScale != null) pair(48, e.lineScale);
+    if (e.cadColor7 && e.color === "#ffffff") pair(62, 7);
+    else if (e.color) pair(420, parseInt(e.color.slice(1), 16));
+    else if (e.colorByBlock) pair(62, 0);
+    if (e.hidden) pair(60, 1);
+    if (e.lineWeight != null) pair(370, Math.round(e.lineWeight * 100));
     if (subclass) pair(100, subclass);
     return handle;
   };
@@ -160,27 +204,44 @@ export function toDXF(doc) {
     if (needsMtext(e)) {
       start("MTEXT", e, "AcDbMText");
       const r = e.rotation || 0;
-      point({
-        x: e.point.x - Math.sin(r) * e.height,
-        y: e.point.y + Math.cos(r) * e.height,
+      const top = -textLayout(e).top;
+      point(e.textAttachment ? e.point : {
+        x: e.point.x - Math.sin(r) * top,
+        y: e.point.y + Math.cos(r) * top,
       });
       pair(30, 0);
       pair(40, e.height);
-      pair(41, 0);
-      pair(71, 1);
+      pair(7, textStyleName(e));
+      pair(41, e.textWidth || 0);
+      pair(71, e.textAttachment || ["left", "center", "right"].indexOf(textAlignment(e)) + 1);
       pair(72, 1);
+      if(e.textColumns){const c=e.textColumns;
+        pair(75,c.type);pair(76,c.count);pair(78,c.reversed?1:0);pair(79,c.autoHeight?1:0);
+        pair(48,c.width);pair(49,c.gutter);
+        pair(50,c.heights.length);for(const h of c.heights)pair(50,h);
+      }
       for (const [code, value] of textChunks(mtextContent(e)))
         pair(code, value);
       pair(11, Math.cos(r));
       pair(21, Math.sin(r));
       pair(31, 0);
-      pair(73, 2);
-      pair(44, 1.4 / (5 / 3));
+      pair(73, e.lineSpacingStyle || 2);
+      pair(44, (e.lineSpacing || 1.4) / (5 / 3));
     } else {
       start("TEXT", e, "AcDbText");
       point(e.point);
       pair(40, e.height);
       pair(1, str(e.text));
+      pair(7, textStyleName(e));
+      pair(41, e.widthFactor || 1);
+      pair(51, (e.oblique || 0) * 180 / Math.PI);
+      pair(71, (e.textMirrorX ? 2 : 0) | (e.textMirrorY ? 4 : 0));
+      const h = e.textFitWidth ? 5 : { left: 0, center: 1, right: 2 }[e.textAlign] || 0;
+      pair(72, h);
+      if (h || (e.textVertical && e.textVertical !== "baseline")) {
+        point(e.textFitWidth ? { x: e.point.x + Math.cos(e.rotation || 0) * e.textFitWidth, y: e.point.y + Math.sin(e.rotation || 0) * e.textFitWidth } : e.point, 11, 21); pair(31, 0);
+      }
+      pair(73, { baseline: 0, bottom: 1, middle: 2, top: 3 }[e.textVertical] || 0);
       pair(50, ((e.rotation || 0) * 180) / Math.PI);
       pair(100, "AcDbText");
     }
@@ -192,18 +253,32 @@ export function toDXF(doc) {
     pair(30, 0);
     pair(40, e.height);
     pair(1, str(e.text));
+    pair(7, textStyleName(e)); pair(41, e.widthFactor || 1); pair(51, (e.oblique || 0) * 180 / Math.PI);
+    pair(71, (e.textMirrorX ? 2 : 0) | (e.textMirrorY ? 4 : 0));
+    pair(72, { left: 0, center: 1, right: 2 }[e.textAlign] || 0); point(e.point, 11, 21); pair(31, 0);
     pair(50, ((e.rotation || 0) * 180) / Math.PI);
     pair(100, type === "ATTDEF" ? "AcDbAttributeDefinition" : "AcDbAttribute");
     if (type === "ATTDEF") pair(3, e.attributeTag);
     pair(2, e.attributeTag);
-    pair(70, 0);
+    pair(70, e.hidden ? 1 : 0);
     pair(73, 0);
-    pair(74, 0);
+    pair(74, { baseline: 0, bottom: 1, middle: 2, top: 3 }[e.textVertical] || 0);
     pair(280, 0);
+  };
+  const writeAnnotation = e => {
+    const metadata=structuredClone(annotationMetadata(e));if(!Object.keys(metadata).length)return;
+    if(metadata.annotationVariants){
+      metadata.annotationLayerNames=true;
+      const names=part=>{if(part.layer)part.layer=doc.layers.find(l=>l.id===part.layer)?.name||part.layer;if(part.definition)part.definition.entities.forEach(names);if(part.dimensionGraphics)part.dimensionGraphics.forEach(names);if(part.attributeOverrides)Object.values(part.attributeOverrides).forEach(names);};
+      metadata.annotationVariants.forEach(v=>names(v.entity));
+    }
+    pair(1001,"LIRA_ANNOTATION");const json=JSON.stringify(metadata);
+    for(let i=0;i<json.length;i+=200)pair(1000,json.slice(i,i+200));
   };
   const writeEntity = (e) => {
     if (e.type === "dimension") {
       writeDimension(e, start, pair, point);
+      writeAnnotation(e);
       return;
     }
     if (e.type === "block") {
@@ -217,6 +292,7 @@ export function toDXF(doc) {
       pair(42, e.mirrored ? -e.scale : e.scale);
       pair(43, e.scale);
       pair(50, ((e.rotation || 0) * 180) / Math.PI);
+      writeAnnotation(e);
       for (const part of attributes)
         writeAttribute({ ...part, _owner: owner }, "ATTRIB");
       if (attributes.length) start("SEQEND", { ...e, _owner: owner }, null);
@@ -224,6 +300,7 @@ export function toDXF(doc) {
     }
     if (e.type === "text" && e.attributeTag) {
       writeAttribute(e, "ATTDEF");
+      writeAnnotation(e);
       return;
     }
     if (e.type === "viewport") {
@@ -237,7 +314,9 @@ export function toDXF(doc) {
       pair(41, h);
       pair(68, 1);
       pair(69, viewportId++);
-      point(e.viewCenter, 12, 22);
+      const rotation = e.viewRotation || 0;
+      point({ x: Math.cos(rotation) * e.viewCenter.x + Math.sin(rotation) * e.viewCenter.y, y: -Math.sin(rotation) * e.viewCenter.x + Math.cos(rotation) * e.viewCenter.y }, 12, 22);
+      pair(51, -rotation * 180 / Math.PI);
       pair(16, 0);
       pair(26, 0);
       pair(36, 1);
@@ -311,30 +390,30 @@ export function toDXF(doc) {
       pair(210, 0);
       pair(220, 0);
       pair(230, 1);
-      pair(2, "ANSI31");
-      pair(70, 0);
+      pair(2, e.solid ? "SOLID" : str(e.patternName || "ANSI31"));
+      pair(70, e.solid ? 1 : 0);
       pair(71, 0);
-      pair(91, 1);
-      pair(92, 2);
-      pair(72, 0);
-      pair(73, 1);
-      pair(93, e.points.length);
-      for (const p of e.points) point(p);
-      pair(97, 0);
+      pair(91, 1 + (e.holes?.length || 0));
+      for (const loop of [e.points, ...(e.holes || [])]) {
+        pair(92, 2); pair(72, 0); pair(73, 1); pair(93, loop.length);
+        for (const p of loop) point(p); pair(97, 0);
+      }
       pair(75, 0);
       pair(76, 1);
+      if (!e.solid) {
       pair(52, 0);
       pair(41, 1);
       pair(77, 0);
-      pair(78, 1);
-      pair(53, ((e.patternAngle ?? Math.PI / 4) * 180) / Math.PI);
-      pair(43, 0);
-      pair(44, 0);
-      pair(45, -e.spacing * Math.sin(e.patternAngle ?? Math.PI / 4));
-      pair(46, e.spacing * Math.cos(e.patternAngle ?? Math.PI / 4));
-      pair(79, 0);
+      const pattern=hatchPattern(e);pair(78,pattern.length);
+      for(const line of pattern){
+        pair(53,line.angle*180/Math.PI);pair(43,line.base.x);pair(44,line.base.y);
+        pair(45,line.offset.x);pair(46,line.offset.y);pair(79,line.dashes.length);
+        for(const dash of line.dashes)pair(49,dash);
+      }
+      }
       pair(98, 0);
     }
+    writeAnnotation(e);
   };
   for (const e of doc.entities) {
     const extra =

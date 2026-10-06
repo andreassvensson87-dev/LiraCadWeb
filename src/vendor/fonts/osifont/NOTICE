@@ -1,0 +1,19 @@
+osifont — unmodified upstream TrueType font
+Copyright: Zefram Cochrane (hikikomori82@gmail.com) and contributors.
+Source: https://github.com/hikikomori82/osifont
+Pinned revision: 2e9aa86a8a09b044e08c00f5a4a2505dc3ca9f6e
+
+The font is distributed under GNU GPL version 3 with the font exception below.
+COPYING contains the GPL v3 terms. osifont.sfd and generate.py/generate.sh are
+the corresponding source and generation scripts. README.md and MANUAL are
+upstream documentation. The binary and source are distributed unmodified.
+LiraCAD ISO is an application font-family alias; the font has not been renamed.
+
+As a special exception, if you create a document which uses this font, and embed
+this font or unaltered portions of this font into the document, this font does
+not by itself cause the resulting document to be covered by the GNU General
+Public License. This exception does not however invalidate any other reasons
+why the document might be covered by the GNU General Public License. If you
+modify this font, you may extend this exception to your version of the font,
+but you are not obligated to do so. If you do not wish to do so, delete this
+exception statement from your version.

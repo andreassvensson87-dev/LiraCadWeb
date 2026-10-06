@@ -1,9 +1,13 @@
+import { viewportEntities } from "./annotation-context.js";
+import { drawBlockParameterOverlay } from "./block-parameter-overlay.js";
+import { screenPoint, worldPoint } from "./camera.js";
 import { createEntityRenderer } from "./entity-renderer.js";
 import { bounds } from "./entity-geometry.js";
 import { spaceOf, viewportCamera } from "./layout.js";
 import { grips } from "./grips.js";
 import { transforms } from "./command-catalog.js";
 import { createSpatialIndex } from "./spatial-index.js";
+import { paperColor } from "./plot-style.js";
 
 export function gridSpacing(scale) {
   const target = 65 / scale, power = 10 ** Math.floor(Math.log10(target));
@@ -21,24 +25,34 @@ export function viewportClip(viewport, camera, width, height) {
 // Synchronous painter: reads a frame, writes only the canvas, and owns the
 // temporary camera used for clipped model views. It has no DOM or app globals.
 export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof OffscreenCanvas === 'undefined' ? null : new OffscreenCanvas(w,h) }) {
+  let paintingPaper = false;
   let frame, camera, layers, spatial, indexedEntities, background, backgroundKey, backgroundCamera;
   const layerOf = (e) => layers.get(e.layer);
   const drawingSpace = () => frame.activeViewportId ? "model" : frame.activeSpace;
-  const screen = (p) => ({ x: (p.x - camera.x) * camera.scale + frame.width / 2, y: frame.height / 2 - (p.y - camera.y) * camera.scale });
-  const world = (p) => ({ x: (p.x - frame.width / 2) / camera.scale + camera.x, y: (frame.height / 2 - p.y) / camera.scale + camera.y });
+  const screen = (p) => screenPoint(p, camera, frame.width, frame.height);
+  const world = (p) => worldPoint(p, camera, frame.width, frame.height);
   const movedViewport = () => frame.movedViewport;
   const activeClip = () => {
     const viewport = frame.doc.entities.find((e) => e.id === frame.activeViewportId);
     return viewport ? viewportClip(viewport, frame.paperCamera, frame.width, frame.height) : null;
   };
-  const { path, drawEntity } = createEntityRenderer({ ctx, screen, getCamera: () => camera, layerOf });
-  function paintEntities(space, onPaper = false, interactive = true, additions = null) {
+  const { path, drawEntity } = createEntityRenderer({ ctx, screen, getCamera: () => camera, layerOf, foregroundColor: () => paintingPaper ? "#000000" : "#ffffff",paperScale:()=>paintingPaper?(frame.paperCamera||frame.camera).scale:null,monochrome:()=>paintingPaper && !!frame.doc.layouts.find(l=>l.id===frame.activeSpace)?.monochrome });
+  function paintEntities(space, onPaper = false, interactive = true, additions = null, viewport = null) {
+    paintingPaper = onPaper;
     const { doc, width, height, selection, hover } = frame;
     const previewTarget = interactive && space === drawingSpace() ? frame.previewTarget : null;
     const tl = world({ x: 0, y: 0 }),
       br = world({ x: width, y: height });
-    const region = {minX:tl.x,maxX:br.x,minY:br.y,maxY:tl.y};
-    for (const e of additions || spatial.query(region, true)) {
+    const corners = [tl, br, world({ x: width, y: 0 }), world({ x: 0, y: height })];
+    const region = { minX: Math.min(...corners.map(p => p.x)), maxX: Math.max(...corners.map(p => p.x)), minY: Math.min(...corners.map(p => p.y)), maxY: Math.max(...corners.map(p => p.y)) };
+    const replacement = frame.textReplacement;
+    let entities = additions || spatial.query(region, true);
+    if(viewport){
+      // Context positions can lie outside the base entity spatial bounds.
+      const annotated=viewport.annotationScale?doc.entities.filter(e=>e.annotationVariants?.length || e.annotationContexts?.length || e.type==="block" && e.definition.entities.some(p=>p.annotationVariants?.length || p.annotationContexts?.length)):[];
+      entities=viewportEntities([...new Map([...entities,...annotated].map(e=>[e.id,e])).values()],viewport,doc.layers);
+    }
+    for (const e of [...entities.filter(e => e.id !== replacement?.originalId), ...(replacement ? [replacement.entity] : [])]) {
       if (
         e.id === previewTarget ||
         spaceOf(e) !== space ||
@@ -55,7 +69,7 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
           ? onPaper
             ? "#35836b"
             : "#e3f4d7"
-          : e.color || (onPaper ? "#34473f" : layerOf(e).color);
+          : onPaper ? paperColor(e,layerOf(e),frame.doc.layouts.find(l=>l.id===frame.activeSpace)?.monochrome) : e.color || layerOf(e).color;
       drawEntity(e, color, selected);
     }
   }
@@ -100,7 +114,7 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
         activeViewportId === v.id
           ? saved
           : viewportCamera(v, base, width, height);
-      paintEntities("model", true, activeViewportId === v.id);
+      paintEntities("model", true, activeViewportId === v.id,activeViewportId===v.id?frame.interactionEntities:null,activeViewportId===v.id?null:v);
       ctx.restore();
       camera = base;
       drawEntity(
@@ -130,7 +144,7 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
     try {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
-      const key = [spatial, JSON.stringify(doc.layers), camera.x, camera.y, camera.scale, width, height, dpr, showGrid, frame.hover, [...selection].join(','), frame.previewTarget];
+      const key = [spatial, JSON.stringify(doc.layers), camera.x, camera.y, camera.scale, width, height, dpr, showGrid, frame.hover, [...selection].join(','), frame.previewTarget, camera.rotation || 0, JSON.stringify(frame.textReplacement)];
       const stableScene = backgroundKey?.every((value,i)=>i >= 2 && i <= 4 || value === key[i]);
       const ratio = backgroundCamera ? camera.scale / backgroundCamera.scale : 1;
       const dx = backgroundCamera ? width/2*(1-ratio) + (backgroundCamera.x-camera.x)*camera.scale : 0;
@@ -160,7 +174,7 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
       const step = gridSpacing(camera.scale),
         tl = world({ x: 0, y: 0 }),
         br = world({ x: width, y: height });
-      if (showGrid) {
+      if (showGrid && !camera.rotation) {
         ctx.save();
         ctx.strokeStyle = activeSpace === "model" ? "#3b535b" : "#aab5bc";
         ctx.lineWidth = 0.6;
@@ -197,8 +211,8 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
           ctx.clip();
         }
       }
-      if (!tool) {
-        for (const e of (selection.size ? doc.entities : []).filter(
+      if (!tool && !frame.textReplacement) {
+        for (const e of (selection.size ? frame.interactionEntities||doc.entities : []).filter(
           (e) => selection.has(e.id) && frame.editableIds.has(e.id),
         ))
           for (const g of grips(e)) {
@@ -215,6 +229,7 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
           }
       }
       for (const e of frame.previews) drawEntity(e, "#8ae4b6", false, true);
+      drawBlockParameterOverlay(ctx,frame.blockParameter,frame.doc.entities,screen);
       if (drag?.kind === "grip") {
         for (const e of frame.gripPreviews)
           drawEntity(e, "#a0f3c7", true, true);

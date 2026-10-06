@@ -7,6 +7,8 @@ import { validDocument } from "../src/document.js";
 import { transform } from "../src/entity-transform.js";
 import { definitions, aliases, transforms } from "../src/command-catalog.js";
 import { drawingTools } from "../src/drawing-tools.js";
+import { stretchTools } from "../src/stretch-tools.js";
+import { wblockTools } from "../src/wblock-tools.js";
 import { transformTools } from "../src/transform-tools.js";
 import { editingTools } from "../src/editing-tools.js";
 import { cornerTools } from "../src/corner-tools.js";
@@ -21,7 +23,7 @@ import { utilityTools } from "../src/utility-tools.js";
 const root = new URL("../src/", import.meta.url);
 test("all interactive catalog commands have one tool owner; block session entry is handled by the shell", () => {
   const owners = new Map();
-  for (const tools of [drawingTools, transformTools, editingTools, cornerTools, vertexTools, structureTools, dimensionTools, blockTools, viewportTools, annotationTools, utilityTools]) {
+  for (const tools of [drawingTools, stretchTools, wblockTools, transformTools, editingTools, cornerTools, vertexTools, structureTools, dimensionTools, blockTools, viewportTools, annotationTools, utilityTools]) {
     for (const [name, tool] of Object.entries(tools)) {
       assert.ok(!owners.has(name), `Duplicate owner for ${name}`);
       owners.set(name, tool);

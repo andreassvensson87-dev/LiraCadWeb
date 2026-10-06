@@ -1038,12 +1038,13 @@ footer > div {
 #text-editor {
   position: absolute;
   z-index: 10;
-  width: 330px;
+  width: min(330px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
   background: #f6faf7;
   border: 1px solid #69b391;
   border-radius: 7px;
   box-shadow: 0 8px 24px #001c2944;
-  overflow: hidden;
+  overflow: auto;
 }
 #text-editor[hidden] {
   display: none;
@@ -1070,6 +1071,25 @@ footer > div {
 .text-toolbar button[aria-pressed="true"] {
   background: #c4e7d4;
   color: #166e4b;
+}
+.text-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 8px;
+  border-bottom: 1px solid #d3e3d9;
+}
+.text-editor-target { padding: 7px 8px 0; font-size: 11px; color: #516c5e; overflow-wrap: anywhere; }
+.text-settings label { display: grid; gap: 3px; font-size: 10px; color: #516c5e; }
+.text-settings input, .text-settings select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 5px;
+  border: 1px solid #d3e3d9;
+  border-radius: 3px;
+  background: white;
+  color: #223e31;
 }
 #inline-text {
   display: block;
@@ -1408,7 +1428,7 @@ body[data-lira-app="cad"] .workspace {
   display: grid;
   grid-template-columns:
     32px minmax(140px, 1fr) minmax(150px, 1fr)
-    32px 32px 80px;
+    32px 32px 80px minmax(95px, 0.6fr);
   gap: 12px;
   align-items: center;
   padding: 10px;

@@ -1,3 +1,6 @@
+import { annotationView, storeAnnotationView, createAnnotationView, plainAnnotationEntity, copyAnnotationView } from "./annotation-edit.js";
+import { loadCadFonts } from "./cad-fonts.js";
+import { cameraVector, screenPoint, worldPoint } from "./camera.js";
 import { createLayoutInspector } from "./layout-inspector.js";
 import { createBlockInspector } from "./block-inspector.js";
 import { createGeneralInspector } from "./general-inspector.js";
@@ -10,6 +13,8 @@ import { createLayerPanel } from "./layer-panel.js";
 import { initializeLiraShell } from "./lira-shell.js";
 import { Editor } from "./editor.js";
 import { drawingTools } from "./drawing-tools.js";
+import { stretchTools } from "./stretch-tools.js";
+import { wblockTools } from "./wblock-tools.js";
 import { transformTools, applyTransformChange } from "./transform-tools.js";
 import { editingTools, applyEditingChange } from "./editing-tools.js";
 import { cornerTools } from "./corner-tools.js";
@@ -38,14 +43,19 @@ import { ProjectStorage } from "./project-storage.js";
 import { ProjectWorkspace } from "./project-workspace.js";
 import {
   blockTemplates,
+  blockParts,
+  withAttributeText,
 } from "./blocks.js";
 import { setupPWA } from "./pwa.js";
+import { createFileOpenQueue, setupFileLaunch } from "./file-launch.js";
 import { layoutSVG } from "./plot.js";
 import {
   spaceOf,
   viewportCamera,
   viewportFromCamera,
   viewportContains,
+  fitViewportToEntities,
+  recoverEmptyViewports,
   paperSnaps,
 } from "./layout.js";
 import { grips, gripTargets, moveGripTargets } from "./grips.js";
@@ -93,6 +103,7 @@ for (const [i, [name, label, a]] of definitions
   ).append(b);
 }
 let blockEditor = null;
+let parameterEdit = null;
 const projectWorkspace = new ProjectWorkspace({
   createStorage: id => new ProjectStorage(new IndexedDBProjectStore(undefined,{key:id}), {
     legacyStorage: id === 'current' ? () => localStorage : null,
@@ -107,7 +118,8 @@ const projectWorkspace = new ProjectWorkspace({
 });
 document.body.inert = true;
 $('#save-state').textContent = 'Läser projekt…';
-const initialProject = await projectWorkspace.restore();
+// Load before measuring restored text or building its spatial index.
+const [initialProject] = await Promise.all([projectWorkspace.restore(), loadCadFonts()]);
 let projectStorage = initialProject.storage;
 const restored = initialProject.restored;
 let documentSession = initialProject.session;
@@ -153,23 +165,21 @@ function navigating() {
   clearTimeout(navigationTimer);
   navigationTimer = setTimeout(schedule, 130);
 }
+let interactionEntities, interactionViewport;
 let activeSpace = "model",
   activeViewportId = null,
   paperCamera = null;
 const spaceCameras = new Map();
 const drawingSpace = () => (activeViewportId ? "model" : activeSpace);
+const currentViewport=()=>doc.entities.find(e=>e.id===activeViewportId);
+const viewEntity=e=>spaceOf(e)==="model"?annotationView(e,currentViewport(),doc.layers):e;
 const layerOf = (e) => doc.layers.find((l) => l.id === e.layer),
   visible = (e) =>
-    layerOf(e)?.visible !== false && spaceOf(e) === drawingSpace(),
+    !e.hidden && layerOf(e)?.visible !== false && spaceOf(e) === drawingSpace() && !(activeViewportId && doc.entities.find(v=>v.id===activeViewportId)?.frozenLayers?.includes(layerOf(e)?.name)),
   editable = (e) => visible(e) && !layerOf(e)?.locked;
-const world = (p) => ({
-  x: (p.x - width / 2) / camera.scale + camera.x,
-  y: (height / 2 - p.y) / camera.scale + camera.y,
-});
-const screen = (p) => ({
-  x: (p.x - camera.x) * camera.scale + width / 2,
-  y: height / 2 - (p.y - camera.y) * camera.scale,
-});
+const world = (p) => worldPoint(p, camera, width, height);
+const screen = (p) => screenPoint(p, camera, width, height);
+
 const svg = (n) =>
   `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.3">${icons[n] || icons.LINE}</svg>`;
 const fmt = (n) =>
@@ -222,15 +232,19 @@ const { attributeValueField, attributeDefinitionFields, renderAttributeManager }
 });
 const renderEntityProperties = createEntityInspector({
   field, choice, section, action, editSelected, refresh: renderInspector,
-  attributeDefinitionFields, appearanceFields, enterViewport, beginTextEdit,
+  attributeDefinitionFields, appearanceFields, enterViewport, fitViewport, beginTextEdit,
+  getAnnotationScale:()=>currentViewport()?.annotationScale,
+  createAnnotationVariant:entity=>{const source=doc.entities.find(e=>e.id===entity.id);if(source)replaceEntities("Skapa annotationsvariant",doc.entities.map(e=>e.id===source.id?createAnnotationView(e,currentViewport()):e));},
 });
 const renderLayoutProperties = createLayoutInspector({
   field, choice, section, action, getDocument: () => doc, commit, log,
   refresh: renderInspector, afterFormat: fit, afterRemove: () => { cancel(); fit(); },
+  recoverViews:recoverLayoutViews,
 });
 const blockInspector = createBlockInspector({
-  field, section, action, getDocument: () => doc, commit, finishEdit: finishBlockEdit,
-  renderAttributeManager, attributeValueField, editSelected, beginEdit: beginBlockEdit, erase,
+  refresh:()=>{renderInspector();schedule();},
+  field, section, action, startParameter:request=>{parameterEdit=request||null;try{start("BSTRETCH");}finally{parameterEdit=null;}}, getDocument: () => doc, commit, finishEdit: finishBlockEdit,
+  renderAttributeManager, attributeValueField, editSelected, beginEdit: beginBlockEdit, beginAttributeEdit: beginAttributeTextEdit, erase,
 });
 const renderLayers = createLayerPanel({
   document,
@@ -245,22 +259,28 @@ const renderLayers = createLayerPanel({
   commit, cancel, log, field, choice, action,
 });
 const editor = new Editor({
-  tools: { ...drawingTools, ...transformTools, ...editingTools, ...cornerTools, ...vertexTools, ...structureTools, ...dimensionTools, ...blockTools, ...viewportTools, ...annotationTools, ...utilityTools },
+  tools: { ...drawingTools, ...stretchTools, ...wblockTools, ...transformTools, ...editingTools, ...cornerTools, ...vertexTools, ...structureTools, ...dimensionTools, ...blockTools, ...viewportTools, ...annotationTools, ...utilityTools },
   getContext: () => ({
     entities: selectedEntities(),
+    isBlockEditor:Boolean(blockEditor),stretchParameters:doc.stretchParameters||[],parameterEdit,
     creationDefaults,
-    ...(tool && Object.hasOwn(blockTools, tool.name) ? { templates: blockTemplates(doc) } : {}),
+    ...(tool && (Object.hasOwn(blockTools, tool.name)||tool.name==='WBLOCK') ? { templates: blockTemplates(doc) } : {}),
     ...(tool?.name === "MVIEW" ? { modelCenter: modelExtentsCenter(), activeViewportId } : {}),
     creation: { layer: activeLayer, space: drawingSpace(), color: creationColor, lineType: creationLineType, ...creationDefaults.dimension },
-    ...(tool && ["OFFSET", "TRIM", "EXTEND", "FILLET", "CHAMFER", "PINSERT", "PDELETE", ...Object.keys(dimensionTools)].includes(tool.name) ? {
-      editableEntities: doc.entities.filter(editable),
+    ...(tool && ["OFFSET", "TRIM", "EXTEND", "FILLET", "CHAMFER", "PINSERT", "PDELETE", "STRETCH", "BSTRETCH", ...Object.keys(dimensionTools)].includes(tool.name) ? {
+      editableEntities: (interactionEntities||doc.entities).filter(editable),
       hitEntity: ["TRIM", "EXTEND", "FILLET", "CHAMFER", ...Object.keys(dimensionTools)].includes(tool.name) ? hit(rawCursor) : null,
       pointer: rawCursor,
     } : {}),
   }),
   setSelection: (ids) => { selection = new Set(ids); },
   applyChange: (change) => {
-    if (change.kind === "editing") {
+    if(change.kind === "wblock") {
+      documentWorkflow.exportWblock(change);
+    } else if(change.kind === "blockParameter") {
+      if(!blockEditor)throw Error("Öppna blockeditorn först.");
+      commit(change.label,draft=>{const index=draft.stretchParameters?.findIndex(p=>p.id===change.parameter.id)??-1;if(index>=0)draft.stretchParameters[index]=change.parameter;else draft.stretchParameters=[...(draft.stretchParameters||[]),change.parameter];});
+    } else if (change.kind === "editing") {
       applyObjectChange(change);
     } else if (change.operation) {
       const result = applyTransformChange(doc.entities, change);
@@ -285,15 +305,27 @@ const editor = new Editor({
     tool = state;
   },
 });
+let textEditTarget = null;
 const textEditor = createTextEditor({
   document, screen, getSize: () => ({ width, height }),
+  getAvoidBounds: () => {
+    const block = textEditTarget && doc.entities.find(e => e.id === textEditTarget.blockId);
+    return block ? bounds(block) : null;
+  },
   beforeBegin: () => { clearTracking(); editor.cancel(); tool = null; drag = null; snap = null; },
-  applyChange: applyObjectChange,
+  applyChange: change => {
+    if (!textEditTarget) return applyObjectChange(change);
+    const source = doc.entities.find(e => e.id === textEditTarget.blockId);
+    const block=source && viewEntity(source);
+    if (!block || !editableIds.has(block.id) || block.definition.id !== textEditTarget.definitionId) throw Error("Blocket har ändrats eller kan inte längre redigeras.");
+    applyObjectChange({ ...change, label: "Redigera blockattribut", replaceId: block.id, entities: [withAttributeText(block, textEditTarget.tag, change.entities[0])] });
+  },
   afterFinish: ({ selection: ids }) => {
+    textEditTarget = null;
     if (ids) selection = new Set(ids);
     update(); prompt(); canvas.focus();
   },
-  refresh: prompt, log,
+  refresh: () => { prompt(); schedule(); }, log,
 });
 function log(s) {
   const el = document.createElement("div");
@@ -345,10 +377,12 @@ function leaveViewport() {
   cancel();
 }
 function enterViewport(e) {
+  if(e.annotationScale)log(`Modellvy · annotationsskala 1:${e.annotationScale}. Ändringar av en skalvariant gäller denna annotationsskala.`);
   if (textEditor.active && !finishTextEdit(true)) return;
   cancel();
   paperCamera = { ...camera };
   activeViewportId = e.id;
+  indexedSpace = null;
   setCreationMode("model");
   camera = viewportCamera(e, paperCamera, width, height);
   rebuild();
@@ -449,10 +483,12 @@ function inActiveViewport(pixel) {
 }
 function rebuild() {
   const space = drawingSpace();
-  if (indexedDocument === doc && indexedSpace === space) return;
-  sceneIndex = sceneIndex ? sceneIndex.update(doc.entities) : createSpatialIndex(doc.entities, bounds);
-  snapCache = snapCache ? snapCache.update(doc.entities,sceneIndex) : createLocalSnapIndex(doc.entities,{entityIndex:sceneIndex,eligible:visible});
-  editableIds = new Set(doc.entities.filter(editable).map(e => e.id));
+  if (indexedDocument === doc && indexedSpace === space && interactionViewport===activeViewportId) return;
+  interactionViewport=activeViewportId;
+  interactionEntities=doc.entities.map(viewEntity).filter(Boolean);
+  sceneIndex = sceneIndex ? sceneIndex.update(interactionEntities) : createSpatialIndex(interactionEntities, bounds);
+  snapCache = snapCache ? snapCache.update(interactionEntities,sceneIndex) : createLocalSnapIndex(interactionEntities,{entityIndex:sceneIndex,eligible:visible});
+  editableIds = new Set(interactionEntities.filter(editable).map(e => e.id));
   indexedDocument = doc;
   indexedSpace = space;
 }
@@ -587,9 +623,10 @@ function make(type, props) {
 }
 function selectedEntities() {
   if (!selection.size) return [];
-  return doc.entities.filter((e) => selection.has(e.id) && editable(e));
+  return (interactionEntities||doc.entities).filter((e) => selection.has(e.id) && editable(e));
 }
 function addEntities(es, label) {
+  es=es.map(e=>{const source=e._annotationSource&&doc.entities.find(p=>p.id===e._annotationSource);return source?copyAnnotationView(source,e,currentViewport()):e;});
   const previous=doc;
   if (!documentSession.append(label,es)) return;
   doc=documentSession.document;
@@ -598,7 +635,7 @@ function addEntities(es, label) {
     try { projectStorage.recordAddition(doc,added); }
     catch(error){log('Tillfällig sparlogg kunde inte uppdateras: '+error.message);}
   }
-  if (indexedDocument===previous && indexedSpace===drawingSpace()) {
+  if (!activeViewportId && indexedDocument===previous && indexedSpace===drawingSpace()) {
     sceneIndex=sceneIndex.append(added);
     snapCache.append(added,sceneIndex);
     for(const entity of added)if(editable(entity))editableIds.add(entity.id);
@@ -621,6 +658,7 @@ function applyObjectChange(change) {
   });
 }
 function replaceEntities(label, entities) {
+  entities=entities.map(e=>{const source=e._annotationSource&&doc.entities.find(p=>p.id===e._annotationSource);return source&&e.id===source.id?storeAnnotationView(source,e):e._annotationSource?plainAnnotationEntity(e):e;});
   if(!documentSession.replaceEntities(label,entities))return;
   doc=documentSession.document;
   dirty=true;
@@ -662,7 +700,9 @@ function fit() {
     schedule();
     return;
   }
-  const es = doc.entities.filter(visible);
+  const es = (interactionEntities||doc.entities).filter(visible);
+  const parameter=blockEditor&&blockInspector.getActiveParameter();
+  if(parameter)es.push({type:'polyline',points:[parameter.start,parameter.end,{x:parameter.window.minX,y:parameter.window.minY},{x:parameter.window.maxX,y:parameter.window.maxY}]});
   if (!es.length) {
     camera = { x: 0, y: 0, scale: 0.1 };
     schedule();
@@ -703,10 +743,12 @@ function render() {
     doc, camera, paperCamera, width, height, dpr, activeSpace, activeViewportId,
     selection, hover, tool, cursor, mouse, showGrid, drag, trackAnchors, snap,
     previews: previewEntities(), gripPreviews,
+    blockParameter:blockEditor?blockInspector.getActiveParameter():null,
+    textReplacement: textEditPreview(),
     movedViewport: drag?.kind === "viewportMove" && drag.moved ? movedViewport() : null,
     previewTarget: tool && ["TRIM", "EXTEND"].includes(tool.name) && tool.phase === "trimPick" && editor.preview(cursor).length
       ? hit(rawCursor)?.id : null,
-    editableIds, sceneIndex, navigating: doc.entities.length > 2000 && performance.now() < navigationDeadline,
+    editableIds, sceneIndex, interactionEntities, navigating: doc.entities.length > 2000 && performance.now() < navigationDeadline,
   });
   $("#zoom-level").textContent = `${Math.round(camera.scale * 1000)}%`;
 }
@@ -767,9 +809,13 @@ function start(name) {
     finishBlockEdit(false);
     return;
   }
-  if (blockEditor && ["BLOCK", "INSERT", "MVIEW", "DXF"].includes(name)) {
+  if (name === "BSTRETCH" && !blockEditor) {log("Öppna BEDIT först för att skapa en stretchparameter.");return;}
+  if (blockEditor && ["BLOCK", "INSERT", "MVIEW", "DXF", "WBLOCK"].includes(name)) {
     log("Avsluta blockeditorn först.");
     return;
+  }
+  if(name==='WBLOCK'){
+    clearTracking();tool={name};editor.start(name);lastCommand=name;input.value='';$("#suggestions").hidden=true;log("WBLOCK · Exportera mall som DXF.");prompt();update();return;
   }
   if (name === "MODEL") {
     switchSpace("model");
@@ -869,7 +915,7 @@ function start(name) {
   lastCommand = name;
   input.value = "";
   $("#suggestions").hidden = true;
-  const edit = transforms.includes(name) || ["ERASE", "OFFSET", "TRIM", "EXTEND", "FILLET", "CHAMFER", "PINSERT", "PDELETE", "JOIN", "EXPLODE"].includes(name);
+  const edit = transforms.includes(name) || ["ERASE", "OFFSET", "TRIM", "EXTEND", "FILLET", "CHAMFER", "PINSERT", "PDELETE", "JOIN", "EXPLODE", "STRETCH", "BSTRETCH"].includes(name);
   if (edit) {
     selection = new Set(
       [...selection].filter((id) => editableIds.has(id)),
@@ -1050,7 +1096,50 @@ function moveCursor(ev) {
   resolveCursor();
 }
 function beginTextEdit(entity, isNew = false) {
-  return textEditor.begin(entity, isNew);
+  const started = textEditor.begin(isNew?entity:viewEntity(doc.entities.find(e=>e.id===entity.id)||entity)||entity, isNew);
+  if (started) { textEditTarget = null; textEditor.position(); }
+  return started;
+}
+function fitViewport(entity) {
+  const model = doc.entities.filter(e => spaceOf(e) === "model" && !e.hidden && layerOf(e)?.visible !== false);
+  const next = fitViewportToEntities(entity, model);
+  if (!next) { log("Ingen synlig modellgeometri att anpassa vyn till."); return; }
+  replaceEntities("Anpassa vy till modell", doc.entities.map(e => e.id === entity.id ? next : e));
+}
+function recoverLayoutViews(layoutId){
+  const model=doc.entities.filter(e=>spaceOf(e)==='model' && !e.hidden && layerOf(e)?.visible!==false);
+  const result=recoverEmptyViewports(doc.entities,layoutId,model);
+  if(!result.count){log('Inga tomma vyer kunde återställas i detta ark.');return;}
+  replaceEntities('Återställ tomma vyer',result.entities);
+  log(`${result.count} tomma vyer visar nu en modellöversikt med standardskala. Justera detaljutsnittet via modellvyn och kontrollera arkets skaltexter/skalstockar.`);
+}
+function beginAttributeTextEdit(block, tag) {
+  block = doc.entities.find(e => e.id === block.id) || block;
+  if (!editableIds.has(block.id)) { log("Välj ett synligt, olåst block."); return false; }
+  block=viewEntity(block)||block;
+  const part = blockParts(block).find(p => p.attributeTag === tag);
+  if (!part || part.hidden) { log("Attributet saknas eller är dolt."); return false; }
+  const started = textEditor.begin(part);
+  if (started) {
+    textEditTarget = { blockId: block.id, definitionId: block.definition.id, tag };
+    if (!activeViewportId && part.height * camera.scale < 12) {
+      const b = bounds(block);
+      camera = { x: (b.minX+b.maxX)/2, y: (b.minY+b.maxY)/2, scale: Math.min((width-100)/Math.max(b.maxX-b.minX,part.height), (height-100)/Math.max(b.maxY-b.minY,part.height)) };
+    }
+    textEditor.position();
+    selection = new Set([block.id]); schedule();
+  }
+  return started;
+}
+function textEditPreview() {
+  const entity = textEditor.preview();
+  if (!entity) return null;
+  if (!textEditTarget) return { originalId: textEditor.active.isNew ? null : entity.id, entity };
+  const source = doc.entities.find(e => e.id === textEditTarget.blockId);
+  const block=source && viewEntity(source);
+  if (!block) return null;
+  try { return { originalId: block.id, entity: withAttributeText(block, textEditTarget.tag, entity) }; }
+  catch { return null; }
 }
 function finishTextEdit(save) {
   return textEditor.finish(save);
@@ -1060,6 +1149,12 @@ canvas.addEventListener("dblclick", (ev) => {
   moveCursor(ev);
   const e = hit(rawCursor);
   if (e?.type === "block") {
+    let attribute = null, distance = 7 / camera.scale;
+    for (const part of blockParts(e).filter(p => p.attributeTag && !p.hidden && layerOf(p)?.visible !== false)) {
+      const d = hitDistance(part, rawCursor);
+      if (d <= distance) { attribute = part; distance = d; }
+    }
+    if (attribute && beginAttributeTextEdit(e, attribute.attributeTag)) return;
     beginBlockEdit(e);
     return;
   }
@@ -1122,7 +1217,7 @@ canvas.addEventListener("pointerdown", (ev) => {
   if (!tool) {
     let closest = null,
       distance = 8;
-    for (const e of doc.entities) {
+    for (const e of interactionEntities||doc.entities) {
       if (!selection.has(e.id) || !editable(e)) continue;
       for (const g of grips(e)) {
         const d = dist(screen(g.p), mouse);
@@ -1136,7 +1231,7 @@ canvas.addEventListener("pointerdown", (ev) => {
       drag = {
         kind: "grip",
         targets: gripTargets(
-          doc.entities.filter((e) => selection.has(e.id) && editable(e)),
+          (interactionEntities||doc.entities).filter((e) => selection.has(e.id) && editable(e)),
           closest.g.p,
         ),
         grip: closest.g,
@@ -1161,6 +1256,10 @@ canvas.addEventListener("pointerdown", (ev) => {
       return;
     }
   }
+  if (tool && ["STRETCH","BSTRETCH"].includes(tool.name) && tool.phase === "window" && !tool.points.length) {
+    drag={kind:"stretchWindow",start:{...mouse}};
+    acceptPoint(rawCursor);schedule();return;
+  }
   if (tool && tool.phase !== "select") {
     acceptPoint(cursor);
     schedule();
@@ -1184,8 +1283,8 @@ canvas.addEventListener("pointermove", (ev) => {
   moveCursor(ev);
   if (drag?.kind === "pan") {
     navigating();
-    camera.x = drag.camera.x - (mouse.x - drag.start.x) / camera.scale;
-    camera.y = drag.camera.y + (mouse.y - drag.start.y) / camera.scale;
+    const delta = cameraVector(camera, -(mouse.x - drag.start.x) / camera.scale, (mouse.y - drag.start.y) / camera.scale);
+    camera.x = drag.camera.x + delta.x; camera.y = drag.camera.y + delta.y;
   } else if (["select", "viewportMove"].includes(drag?.kind))
     drag.moved = dist(mouse, drag.start) > 4;
   else if (!tool && !drag) {
@@ -1199,7 +1298,9 @@ canvas.addEventListener("pointermove", (ev) => {
 canvas.addEventListener("pointerup", (ev) => {
   if (!drag) return;
   moveCursor(ev);
-  if (drag.kind === "viewportMove") {
+  if(drag.kind === "stretchWindow") {
+    if(dist(mouse,drag.start)>4 && tool?.phase === "window")acceptPoint(rawCursor);
+  } else if (drag.kind === "viewportMove") {
     if (dist(mouse, drag.start) > 4) {
       const e = movedViewport();
       replaceEntities("Flytta viewport",doc.entities.map((x) => (x.id === e.id ? e : x)));
@@ -1214,7 +1315,7 @@ canvas.addEventListener("pointerup", (ev) => {
           minY: Math.min(a.y, b.y),
           maxY: Math.max(a.y, b.y),
         },
-        ids = doc.entities
+        ids = (interactionEntities||doc.entities)
           .filter(
             (e) => editable(e) && rectSelect(e, r, mouse.x < drag.start.x),
           )
@@ -1268,8 +1369,8 @@ canvas.addEventListener(
     const action = wheelNavigation(ev, $("#navigation-device").value, height);
     navigating();
     if (action.kind === "pan") {
-      camera.x += action.dx / camera.scale;
-      camera.y -= action.dy / camera.scale;
+      const delta = cameraVector(camera, action.dx / camera.scale, -action.dy / camera.scale);
+      camera.x += delta.x; camera.y += delta.y;
     } else {
       const before = world(mouse);
       camera.scale = Math.max(
@@ -1460,7 +1561,7 @@ function toggle(kind) {
 function editSelected(label, fn) {
   commit(label, () => {
     doc.entities = doc.entities.map((e) =>
-      selection.has(e.id) ? fn(clone(e)) : e,
+      selection.has(e.id) ? (()=>{const view=viewEntity(e),edited=fn(clone(view||e));return edited._annotationSource?storeAnnotationView(e,edited):edited;})() : e,
     );
   });
 }
@@ -1508,7 +1609,7 @@ function renderInspector() {
     creationInspector(root);
     return;
   }
-  const es = doc.entities.filter((e) => selection.has(e.id));
+  const es = selectedEntities();
   if (!es.length) {
     if (activeSpace !== "model" && !activeViewportId)
       renderLayoutProperties(root, activeSpace);
@@ -1567,6 +1668,7 @@ function download(name, text, type) {
 }
 
 function beginBlockEdit(entity) {
+  if(entity?._annotationSource){entity=doc.entities.find(e=>e.id===entity.id)||entity;log("Blockeditorn redigerar den gemensamma grunddefinitionen för alla skalor. Textutseende på ett attribut ändrar den aktiva skalvarianten.");}
   if (blockEditor || entity?.type !== "block" || !editable(entity)) {
     log("Markera ett block som kan redigeras först.");
     return;
@@ -1788,14 +1890,11 @@ $("#save-file").onclick = saveProject;
 $("#export-dxf").onclick = exportDxf;
 $("#open-file").onclick = () => $("#file-input").click();
 $("#close-import").onclick = () => $("#import-dialog").close();
-$("#file-input").onchange = async (ev) => {
-  const f = ev.target.files[0];
-  if (!f || documentWorkflow.opening || blockEditor) return;
-  try {
+async function openDrawingFile(f) {
     const result = await documentWorkflow.open(f, {
       onProgress: log,
     });
-    if (!result) return;
+    if (!result) return false;
     const { imported } = result;
     log(`Öppnat ${f.name}`);
     if (imported) {
@@ -1813,10 +1912,26 @@ $("#file-input").onchange = async (ev) => {
       );
       $("#import-dialog").showModal();
     }
-  } catch (e) {
-    log(`Kunde inte öppna: ${e.message}`);
-  }
-  finally { ev.target.value = ""; }
+}
+const fileOpenQueue = createFileOpenQueue({
+  openFile: openDrawingFile,
+  canOpen: () => !blockEditor && !documentWorkflow.opening,
+  onError: error => log(`Kunde inte öppna: ${error.message}`),
+  onPending: count => {
+    const button = $("#queued-files");
+    button.hidden = count === 0;
+    button.textContent = `Öppna väntande filer (${count})`;
+    button.title = "Avsluta blockredigeringen och öppna filerna i nya projektflikar.";
+  },
+});
+$("#queued-files").onclick = () => {
+  if (blockEditor) log("Avsluta blockredigeringen först. Filerna finns kvar i kön.");
+  else fileOpenQueue.resume();
+};
+$("#file-input").onchange = ev => {
+  const files = Array.from(ev.target.files);
+  ev.target.value = "";
+  fileOpenQueue.enqueueFiles(files);
 };
 $("#new-file").onclick = () => {
   try {
@@ -1899,6 +2014,10 @@ setupPWA(async () => {
 });
 
 initializeLiraShell();
+const fileLaunchSupported = setupFileLaunch(fileOpenQueue);
+$("#file-launch-status").textContent = fileLaunchSupported
+  ? "Filöppning från operativsystemet stöds i den här webbläsaren. LiraCAD behöver vara installerad som app för att visas i Windows."
+  : "Den här webbläsaren saknar filöppning från operativsystemet. Installera LiraCAD med Edge eller Chrome på Windows. Öppna projekt fungerar här.";
 
 for (const [id, factor] of [["#zoom-out", 1 / 1.25], ["#zoom-in", 1.25]]) {
   $(id).onclick = () => {

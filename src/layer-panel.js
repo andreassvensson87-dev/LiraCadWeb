@@ -49,7 +49,8 @@ export function createLayerPanel({
       }, "text");
       const current = action(l.id === getActiveLayer() ? "Aktivt" : "Aktivera",
         () => activateLayer(l.id));
-      row.append(color, rename, lineType, eye, lock, current);
+      const plot=choice('Skriv ut',l.plot!==false,[["true","Ja"],["false","Nej"]],v=>edit(l.id,'Lagerutskrift',{plot:v==='true'}));
+      row.append(color, rename, lineType, eye, lock, current,plot);
       root.append(row);
     }
     const button = action("+ Nytt lager", () => {

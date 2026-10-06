@@ -103,3 +103,19 @@ test('append paints only new geometry over the cached background and invalidates
   f.doc={...f.doc,layers:[{id:'visible',color:'#123456'}],entities:[...f.doc.entities,third]};f.sceneIndex=f.sceneIndex.append([third]);
   c.calls.length=0;render(f);assert.equal(c.calls.filter(([name])=>name==='stroke').length,3);
 });
+
+test('live text replacement draws only the draft, including when moved outside the spatial query',()=>{
+ const original={id:'text',type:'text',layer:'visible',point:{x:10000,y:0},height:12,text:'Old'};
+ const f=frame([original]),before=structuredClone(f.doc),c=canvas(),render=createSceneRenderer(c);
+ f.textReplacement={originalId:'text',entity:{...original,point:{x:0,y:0},text:'Draft'}};render(f);
+ assert.ok(c.calls.some(([name,text])=>name==='fillText'&&text==='Draft'));assert.ok(!c.calls.some(([name,text])=>name==='fillText'&&text==='Old'));assert.deepEqual(f.doc,before);
+ c.calls.length=0;f.textReplacement=null;render(f);assert.ok(!c.calls.some(([name])=>name==='fillText'));
+});
+test('paper and clipped model views render transient text without changing the document',()=>{
+ const text={id:'text',type:'text',layer:'visible',point:{x:0,y:0},height:12,text:'Old'};
+ const viewport={id:'vp',type:'viewport',layer:'visible',space:'paper',points:[{x:10,y:10},{x:100,y:90}],viewCenter:{x:0,y:0},viewScale:1};
+ for(const space of ['model','paper']){
+  const e={...text,space};const f=frame([e,viewport]);f.activeSpace='paper';f.textReplacement={originalId:'text',entity:{...e,text:'Draft'}};
+  const c=canvas();createSceneRenderer(c)(f);assert.equal(c.calls.filter(([name,text])=>name==='fillText'&&text==='Draft').length,1);assert.equal(c.calls.filter(([name,text])=>name==='fillText'&&text==='Old').length,0);
+ }
+});

@@ -1,4 +1,7 @@
 import { add, sub, mul, dist, angle, polar, mod } from "./geometry.js";
+export function dimensionGraphicsState(e) {
+  return JSON.stringify([e.kind,e.points,e.axis,e.chain,e.height,e.precision,e.text,e.arrowSize,e.extensionOffset,e.extensionOvershoot,e.textGap,e.measurementScale,e.dimensionPost,e.decimalSeparator,e.zeroSuppress,e.font,e.sourceFont,e.widthFactor,e.oblique,e.dimensionTextPoint]);
+}
 export function dimensionChain(source, measurements, placement, axis) {
   const u = axis || source.axis || { x: 1, y: 0 };
   const projection = (p) => p.x * u.x + p.y * u.y;
@@ -14,6 +17,7 @@ export function dimensionChain(source, measurements, placement, axis) {
     throw Error("Mätpunkterna måste ge olika lägen längs måttlinjen.");
   const result = structuredClone(source);
   delete result.text;
+  delete result.dimensionTextPoint;delete result.dimensionGraphics;delete result.dimensionGraphicsState;
   const middle = (projection(ordered[0]) + projection(ordered.at(-1))) / 2;
   const handle = add(placement, mul(u, middle - projection(placement)));
   return {
@@ -59,6 +63,7 @@ export function continueDimension(source, point, end = 1) {
   const result = structuredClone(source);
   delete result.id;
   delete result.text;
+  delete result.dimensionTextPoint;delete result.dimensionGraphics;delete result.dimensionGraphicsState;
   return {
     ...result,
     kind: "linear",
@@ -67,6 +72,7 @@ export function continueDimension(source, point, end = 1) {
   };
 }
 export function dimensionParts(e) {
+  if(e.dimensionGraphics?.length && e.dimensionGraphicsState===dimensionGraphicsState(e))return e.dimensionGraphics.map(p=>({...p,layer:p.inheritLayer?e.layer:p.layer||e.layer,space:e.space,color:e.color||p.color}));
   if (e.chain) {
     const points = e.points
       .slice(0, -1)
@@ -97,21 +103,31 @@ export function dimensionParts(e) {
     precision = e.precision ?? 0,
     p = e.points;
   const line = (a, b) => parts.push({ type: "line", points: [a, b] });
-  const label = (at, text, rotation = 0) =>
+  const label = (at, text, rotation = 0, textAlign = "left") =>
     parts.push({
       type: "text",
       point: at,
       text,
       height: h,
       rotation,
-      font: "Arial",
+      font: e.font || "Arial",
+      sourceFont:e.sourceFont,
+      widthFactor:e.widthFactor,oblique:e.oblique,
+      textAlign,
+      ...(e.dimensionTextPoint ? {point:e.dimensionTextPoint,textAttachment:5} : {}),
     });
   const arrow = (tip, toward) => {
     const a = angle(tip, toward);
-    line(tip, polar(tip, h * 0.85, a + 0.35));
-    line(tip, polar(tip, h * 0.85, a - 0.35));
+    line(tip, polar(tip, e.arrowSize ?? h * 0.85, a + 0.35));
+    line(tip, polar(tip, e.arrowSize ?? h * 0.85, a - 0.35));
   };
-  const number = (v) => v.toFixed(precision);
+  const number = (v) => {
+    let value=(v*(e.measurementScale??1)).toFixed(precision);
+    if(e.zeroSuppress&8)value=value.replace(/(\.\d*?)0+$/,"$1").replace(/\.$/,"");
+    if(e.zeroSuppress&4)value=value.replace(/^0\./,".");
+    return value.replace(".",e.decimalSeparator||".");
+  };
+  const content=value=>e.text===" "?"":(e.text||e.dimensionPost||"<>").replace(/<>/g,value);
   if (["linear", "aligned"].includes(e.kind)) {
     const [a, b, c] = p;
     let u =
@@ -122,17 +138,20 @@ export function dimensionParts(e) {
       dot = (q, r) => q.x * r.x + q.y * r.y;
     const x = add(a, mul(n, dot(sub(c, a), n))),
       y = add(b, mul(n, dot(sub(c, b), n)));
-    line(a, add(x, mul(n, h * 0.5 * Math.sign(dot(sub(x, a), n) || 1))));
-    line(b, add(y, mul(n, h * 0.5 * Math.sign(dot(sub(y, b), n) || 1))));
+    for(const [origin,end] of [[a,x],[b,y]]){
+      const direction=mul(n,Math.sign(dot(sub(end,origin),n)||1));
+      line(add(origin,mul(direction,e.extensionOffset??0)),add(end,mul(direction,e.extensionOvershoot??h*0.5)));
+    }
     line(x, y);
     arrow(x, y);
     arrow(y, x);
     let r = Math.atan2(u.y, u.x);
     if (r > Math.PI / 2 || r < -Math.PI / 2) r += Math.PI;
     label(
-      add(mul(add(x, y), 0.5), mul(n, h * 0.45)),
-      e.text || number(Math.abs(dot(sub(b, a), u))),
+      add(mul(add(x, y), 0.5), mul(n, e.textGap ?? h * 0.45)),
+      content(number(Math.abs(dot(sub(b, a), u)))),
       r,
+      "center",
     );
   } else if (["radius", "diameter"].includes(e.kind)) {
     const [center, rim, at] = p,
@@ -148,8 +167,7 @@ export function dimensionParts(e) {
     if (e.kind === "diameter") arrow(from, center);
     label(
       add(at, { x: h * 0.4, y: h * 0.4 }),
-      e.text ||
-        `${e.kind === "radius" ? "R" : "Ø"}${number(r * (e.kind === "diameter" ? 2 : 1))}`,
+      content(`${e.kind === "radius" ? "R" : "Ø"}${number(r * (e.kind === "diameter" ? 2 : 1))}`),
     );
   } else if (e.kind === "angular") {
     const [center, a, b, at] = p,
@@ -166,7 +184,8 @@ export function dimensionParts(e) {
     arrow(q2, polar(center, r, start + sweep - Math.sign(sweep) * 0.1));
     label(
       polar(center, r + h * 0.5, start + sweep / 2),
-      e.text || `${number((Math.abs(sweep) * 180) / Math.PI)}°`,
+      content(`${((Math.abs(sweep)*180)/Math.PI).toFixed(precision)}°`),
+      0,"center",
     );
   }
   return parts.map((part) => ({
@@ -182,6 +201,12 @@ export function validDimension(e, pt) {
   return (
     ["linear", "aligned", "radius", "diameter", "angular"].includes(e.kind) &&
     (e.text == null || typeof e.text === "string") &&
+    ['arrowSize','extensionOffset','extensionOvershoot','textGap'].every(key=>e[key]==null || Number.isFinite(e[key]) && e[key]>=0) &&
+    (e.measurementScale==null || Number.isFinite(e.measurementScale) && e.measurementScale>0) &&
+    (e.dimensionTextPoint==null || pt(e.dimensionTextPoint)) &&
+    (e.dimensionPost==null || typeof e.dimensionPost==='string' && e.dimensionPost.length<1000) &&
+    (e.decimalSeparator==null || typeof e.decimalSeparator==='string' && e.decimalSeparator.length===1) &&
+    (e.zeroSuppress==null || Number.isInteger(e.zeroSuppress) && e.zeroSuppress>=0 && e.zeroSuppress<=15) &&
     Array.isArray(e.points) &&
     (e.chain
       ? e.kind === "linear" && !!e.axis && e.points.length >= 3
