@@ -1267,6 +1267,30 @@ footer > div {
   display: grid;
   grid-template-rows: minmax(0, 1fr) 33px;
 }
+body[data-lira-app="cad"] .workspace {
+  grid-template-rows: 37px minmax(0, 1fr) 33px;
+}
+.project-bar {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  background: #edf2ef;
+  border-bottom: 1px solid #c8d5ce;
+  z-index: 15;
+}
+#project-tabs { display: flex; min-width: 0; overflow-x: auto; }
+.project-tab { display: flex; flex-shrink: 0; border-right: 1px solid #c8d5ce; }
+.project-tab [role="tab"] {
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 0 12px; font-size: 12px; border-top: 2px solid transparent; color: #536b60;
+}
+.project-tab:has([aria-selected="true"]) { background: #fff; }
+.project-tab [aria-selected="true"] { border-top-color: #16835f; color: #11765a; font-weight: 600; }
+.project-tab button:hover, #new-project-tab:hover { background: #dcebe2; }
+.project-tab .close-project { padding: 0 9px; color: #536b60; }
+.project-tab .close-project:disabled { opacity: .3; }
+#new-project-tab { flex-shrink: 0; width: 37px; font-size: 21px; color: #536b60; }
+#reopen-project { margin: 4px 8px 4px auto; min-width: 0; max-width: 170px; font-size: 11px; }
 #canvas {
   min-height: 0;
 }

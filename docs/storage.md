@@ -3,6 +3,22 @@
 Autosparningen använder IndexedDB och lagrar dokument utan JSON-serialisering
 för varje skrivning. Lokal projektfilsexport fungerar som tidigare.
 
+## Projektflikar 2026-10-05
+
+Den tidigare ritningen finns kvar under `drafts/current`. Nya projekt har egna
+`drafts/project-<uuid>` och separata sparloggar. `liracad-workspace-v1` håller
+öppna/stängda projekt, aktiv flik och kameravy. Stängning raderar inte projektet;
+det kan återöppnas med listan bredvid projektflikarna. Historik finns per öppen
+session och återställs inte efter omladdning eller återöppning av stängd flik.
+
+`tests/project-workspace.test.mjs` verifierar separata dokument/historik,
+inaktiva autosparningar, separata återställningsloggar, flikåterställning,
+begränsad manifeststorlek, stängning/återöppning och skydd vid lagringsfel.
+Appprovet `tests/workspace/` körs på en ny separat `workspace-*.localhost`-värd.
+Det provar fyra projekt, Ångra/Gör om, kamera/layout, filöppning och återställning
+efter omladdning genom appens UI. Använd inte användarens vanliga appadress för
+detta prov.
+
 ## Verifiering
 
 `tests/project-storage.test.mjs` och tjänst-/filflödestester kontrollerar:

@@ -1,9 +1,10 @@
 // Browser adapter. A write succeeds only when the transaction commits.
 export class IndexedDBProjectStore {
-  constructor(factory = () => globalThis.indexedDB, { name = 'liracad-projects', timeout = 10000 } = {}) {
+  constructor(factory = () => globalThis.indexedDB, { name = 'liracad-projects', timeout = 10000, key = 'current' } = {}) {
     this.factory = factory;
     this.name = name;
     this.timeout = timeout;
+    this.key = key;
     this.connection = null;
     this.database = null;
     // Same-scope IndexedDB transactions execute in creation order. Register
@@ -66,15 +67,15 @@ export class IndexedDBProjectStore {
     });
   }
   async read() {
-    const record = await this.transaction('readonly', store => store.get('current'));
+    const record = await this.transaction('readonly', store => store.get(this.key));
     this.checkpoint = record?.storageVersion === 1 ? record.revision : null;
     return record?.storageVersion === 1 ? record.document : record;
   }
   async write(document, revision = crypto.randomUUID()) {
-    await this.transaction('readwrite', store => store.put({storageVersion:1,revision,document}, 'current'));
+    await this.transaction('readwrite', store => store.put({storageVersion:1,revision,document}, this.key));
     this.checkpoint = revision;
   }
-  clear() { return this.transaction('readwrite', store => store.delete('current')); }
+  clear() { return this.transaction('readwrite', store => store.delete(this.key)); }
   async close() {
     const connection = this.connection;
     this.connection = null;

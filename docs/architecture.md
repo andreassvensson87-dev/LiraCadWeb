@@ -21,6 +21,7 @@ Den här uppdelningen bevarar befintliga filformat och verktygsbeteenden.
 | Filflöde | `document-workflow.js` | Bekräftar text/block, skyddar ändringar under asynkron import och samordnar dokumentbyte/sparande/export med injicerade effekter. |
 | Filformat | `file-import.js`, `dxf-import.js`, `dxf-export.js`, `dxf-dimensions.js`, `dxf-layout.js`, import-workers | Filinläsning, formatmappning och serialisering. Import ersätter aldrig själv aktivt dokument. |
 | Lagring | `project-storage.js`, `document-journal.js`, `indexeddb-project-store.js` | Asynkron återläsning, migrering, debounce, sparordning, återställningslogg och IndexedDB-transaktioner. |
+| Projektflikar | `project-workspace.js` | Separata dokumentsessioner, flikordning, aktivt projekt, stängning och återöppning utan att radera sparade projekt. |
 | Appskal | `app.js`, `lira-shell.js`, `pwa.js`, `update-ui.js` | Kopplar dokument, UI, fokus, webbläsarhändelser och installation. |
 | Inställningar | `settings-panel.js` | Äger inställningsdialogen, status under generering och anropar injicerade navigerings- och dokumentflöden. |
 | Exempel | `demo-document.js`, `stress-document.js` | Skapar exempelritning och stora testdokument. Stresstest byggs i omgångar så att webbläsaren kan visa framsteg. Ingår inte i geometri eller validering. |
@@ -226,8 +227,9 @@ avgränsad funktion i rätt modul.
 
 ## Lokal autosparning
 
-`IndexedDBProjectStore` äger databasen `liracad-projects` och posten `current`
-i objektlagret `drafts`. Data lagras som strukturerade dokument med en separat
+`IndexedDBProjectStore` äger databasen `liracad-projects` och en konfigurerbar post
+i objektlagret `drafts`. Den befintliga ritningen behåller nyckeln `current`;
+nya projekt får `project-<uuid>`. Data lagras som strukturerade dokument med en separat
 lagringsversion och ett unikt checkpoint-ID; äldre råa dokument kan läsas. En skrivning
 är klar först vid transaktionens `complete`; avbrott, kvotfel och blockerad
 öppning avvisas. Öppna anslutningar stängs vid versionsbyte.
@@ -237,6 +239,23 @@ IndexedDB saknar utkast. Den gamla kopian tas bort först efter bekräftad
 transaktion. Misslyckad migrering behåller och öppnar det äldre utkastet;
 oläsbart utkast pausar autosparning så att exempelritningen inte skriver över
 data. Appen väntar på återläsning innan redigering aktiveras.
+
+`ProjectWorkspace` ger varje projekt en egen `DocumentSession` och
+`ProjectStorage`, inklusive separat återställningslogg. Flikraden ligger ovanför
+canvasen; nytt projekt, filöppning och generering öppnar en ny flik. Flikbyte
+avslutar accepterad text och avbryter pågående ritkommando, medan aktiv
+blockredigering måste sparas eller avbrytas först. Autosparningens dokumentgetter
+och kvittens binds till projektet, så att ett senare flikbyte inte ändrar vilken
+ritning som sparas eller uppdaterar fel projekts sparstatus.
+
+Aktivt lager, markering, modell/layout och kameror hålls per projekt. En liten
+`liracad-workspace-v1` i localStorage lagrar flikordning, aktiv flik, kameravy och
+stängda projekt för nästa start; stora markeringslistor serialiseras inte där.
+Nya flikar registreras först efter bekräftad initial dokumentlagring. Stängning
+kräver lyckad dokumentsparning och lagring av fliklistan, och frigör sessionen
+utan att radera dokumentposten. Återöppning och omladdning skapar ny historik;
+Ångra/Gör om bevaras under vanliga flikbyten. Endast aktivt projekt har scen-
+och snapindex i appen; dessa byggs om vid flikbyte.
 
 Autosparning använder debounce och revisionsnummer så att äldre kvittenser
 inte visar ett nyare, ännu osparat dokument som sparat. Adaptern registrerar

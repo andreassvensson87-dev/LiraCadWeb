@@ -472,6 +472,10 @@ body[data-lira-app] .workspace > .lira-inspector-toggle {
   z-index: 14;
   box-shadow: 0 2px 8px #172b3214;
 }
+/* Project tabs sit above the CAD canvas and its floating controls. */
+body[data-lira-app="cad"] .lira-rail,
+body[data-lira-app="cad"] .lira-tool-panel { top: 57px; }
+body[data-lira-app="cad"] .workspace > .lira-inspector-toggle { top: 53px; }
 body[data-lira-app="pdf"] .lira-command-panel {
   position: relative;
   flex-shrink: 0;

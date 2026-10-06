@@ -27,7 +27,7 @@ export function createSettingsPanel({ document, getNavigation, setNavigation, ge
         status.textContent = "Spara eller avbryt textredigeringen först.";
         return;
       }
-      log(`${next.name} · ${next.entities.length.toLocaleString("sv-SE")} objekt genererade. Ångra återställer föregående ritning.`);
+      log(`${next.name} · ${next.entities.length.toLocaleString("sv-SE")} objekt genererade. Ritningen öppnas i en ny projektflik.`);
       status.textContent = "";
       dialog.close();
     } catch (error) { status.textContent = error.message; }

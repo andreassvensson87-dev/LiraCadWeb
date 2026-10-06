@@ -35,6 +35,7 @@ import { copyDocumentSnapshot } from './document-snapshot.js';
 import { createSettingsPanel } from "./settings-panel.js";
 import { createDocumentWorkflow } from "./document-workflow.js";
 import { ProjectStorage } from "./project-storage.js";
+import { ProjectWorkspace } from "./project-workspace.js";
 import {
   blockTemplates,
 } from "./blocks.js";
@@ -92,19 +93,27 @@ for (const [i, [name, label, a]] of definitions
   ).append(b);
 }
 let blockEditor = null;
-const projectStorage = new ProjectStorage(new IndexedDBProjectStore(), {legacyStorage:()=>localStorage,journalStorage:()=>localStorage});
+const projectWorkspace = new ProjectWorkspace({
+  createStorage: id => new ProjectStorage(new IndexedDBProjectStore(undefined,{key:id}), {
+    legacyStorage: id === 'current' ? () => localStorage : null,
+    journalStorage: () => localStorage,
+    key: id === 'current' ? 'liracad-v1' : 'liracad-'+id,
+  }),
+  metadata: () => localStorage, fallback: demoDocument,
+  onError: error => {
+    $('#save-state').textContent = 'Kunde inte spara projektflikar · spara till fil';
+    $('#save-state').title = error.message;
+  },
+});
 document.body.inert = true;
-$('#save-state').textContent = 'Läser lokalt utkast…';
-const restored = await projectStorage.restore(validDocument);
-$('#save-state').textContent = restored.error ? 'Autosparning pausad' : restored.migrationError || restored.recoveryError ? 'Kunde inte autospara' : restored.document ? 'Autosparat lokalt' : 'Lokalt utkast';
-$('#save-state').title = restored.cause?.message || restored.migrationError?.message || restored.recoveryError?.message || '';
-let documentSession = new DocumentSession(restored.document || demoDocument());
+$('#save-state').textContent = 'Läser projekt…';
+const initialProject = await projectWorkspace.restore();
+let projectStorage = initialProject.storage;
+const restored = initialProject.restored;
+let documentSession = initialProject.session;
 let doc = documentSession.document;
-try {
-  await projectStorage.initialize(doc);
-  if(!restored.error&&!restored.migrationError&&!restored.recoveryError)$('#save-state').textContent='Autosparat lokalt';
-}
-catch(error){$('#save-state').textContent='Kunde inte autospara';$('#save-state').title=error.message;}
+$('#save-state').textContent = initialProject.saveState;
+$('#save-state').title = initialProject.saveError?.message || '';
 document.body.inert = false;
 const restoreError = restored.error;
 let activeLayer = doc.layers[0].id,
@@ -459,16 +468,29 @@ function persisted() {
     $('#save-state').textContent='Sparar… · invänta autosparning';
     $('#save-state').title='Senaste ändringen kan återställas först när autosparningen är klar. '+projectStorage.journalError.message;
   }
+  const entry = projectWorkspace.active;
+  entry.saveState = $('#save-state').textContent;
+  entry.saveError = projectStorage.journalError || null;
   projectStorage.schedule(
-    () => doc,
-    reportLocalSave,
+    () => entry.session.document,
+    error => reportProjectSave(entry, error),
   );
+  renderProjectTabs();
 }
-function reportLocalSave(error) {
-  if (blockEditor) return;
-  $('#save-state').textContent = error ? 'Kunde inte autospara · spara till fil' : 'Autosparat lokalt';
-  $('#save-state').title = error?.message || '';
-  if (error) log('Lokal autosparning misslyckades. Använd Spara projekt.');
+function reportProjectSave(entry, error) {
+  entry.saveState = error ? 'Kunde inte autospara · spara till fil' : 'Autosparat lokalt';
+  entry.saveError = error || null;
+  if (projectWorkspace.active === entry && !blockEditor) {
+    showProjectSaveState(entry);
+    if (error) log('Lokal autosparning misslyckades. Använd Spara projekt.');
+  }
+  renderProjectTabs();
+}
+function reportLocalSave(error) { reportProjectSave(projectWorkspace.active,error); }
+function showProjectSaveState(entry) {
+  $('#save-state').textContent = projectWorkspace.manifestError && !entry.saveError
+    ? 'Kunde inte spara projektflikar · spara till fil' : entry.saveState;
+  $('#save-state').title = (entry.saveError || projectWorkspace.manifestError)?.message || '';
 }
 function update() {
   if (
@@ -494,6 +516,7 @@ function update() {
     [...selection].filter((id) => editableIds.has(id)),
   );
   $("#document-name").textContent = doc.name;
+  renderProjectTabs();
   $("#entity-count").textContent = `${doc.entities.length} objekt · mm`;
   $("#selection-badge").textContent = selection.size;
   $("#undo").disabled = !history.past.length;
@@ -1598,10 +1621,11 @@ function finishBlockEdit(save) {
   return true;
 }
 window.addEventListener("pagehide", () => {
-  projectStorage.flush().catch(() => {});
+  captureProjectContext();
+  projectWorkspace.flush().catch(() => {});
 });
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden)projectStorage.flush().catch(()=>{});
+  if(document.hidden){ captureProjectContext(); projectWorkspace.flush().catch(()=>{}); }
 });
 window.addEventListener("beforeunload", (event) => {
   if (blockEditor) {
@@ -1610,20 +1634,129 @@ window.addEventListener("beforeunload", (event) => {
   }
 });
 
+function captureProjectContext() {
+  if (blockEditor) return;
+  const entry = projectWorkspace.active;
+  entry.context = {activeLayer,selection:[...selection],camera:{...camera},activeSpace,
+    activeViewportId,paperCamera:paperCamera && {...paperCamera},
+    spaceCameras:[...spaceCameras],dirty};
+  projectWorkspace.persist();
+}
+function activateProject(entry) {
+  projectWorkspace.activeId = entry.id;
+  documentSession = entry.session;
+  doc = documentSession.document;
+  history = documentSession.history;
+  projectStorage = entry.storage;
+  const saved = entry.context || {};
+  const validCamera = value => value && [value.x,value.y,value.scale].every(Number.isFinite) && value.scale > 0;
+  activeLayer = doc.layers.some(layer => layer.id === saved.activeLayer) ? saved.activeLayer : doc.layers[0].id;
+  selection = new Set(Array.isArray(saved.selection) ? saved.selection : []);
+  activeSpace = saved.activeSpace || 'model';
+  activeViewportId = saved.activeViewportId || null;
+  camera = validCamera(saved.camera) ? {...saved.camera} : {x:0,y:0,scale:.075};
+  paperCamera = validCamera(saved.paperCamera) ? {...saved.paperCamera} : null;
+  spaceCameras.clear();
+  if (Array.isArray(saved.spaceCameras)) for (const pair of saved.spaceCameras)
+    if (Array.isArray(pair) && typeof pair[0] === 'string' && validCamera(pair[1])) spaceCameras.set(pair[0],{...pair[1]});
+  dirty = !!saved.dirty;
+  editor.cancel(); tool = null; drag = null; hover = null; snap = null;
+  space = false; spaceUsed = false; clearTracking();
+  input.value = ''; $('#suggestions').hidden = true; canvas.style.cursor = 'crosshair';
+  clearTimeout(navigationTimer); navigationDeadline = 0;
+  // Retain a single set of render/snap indexes, even with many open projects.
+  sceneIndex = null; snapCache = null; indexedDocument = null; indexedSpace = null;
+  update(); prompt();
+  if (!entry.context) fit();
+  projectWorkspace.persist();
+  showProjectSaveState(entry);
+}
+function prepareProjectSwitch() {
+  if (documentWorkflow.opening) { log('Vänta tills filen har öppnats.'); return false; }
+  if (blockEditor) { log('Spara eller avbryt blockredigeringen innan du byter projekt.'); return false; }
+  if (textEditor.active && !finishTextEdit(true)) return false;
+  syncViewport();
+  cancel(false);
+  captureProjectContext();
+  projectStorage.flush().catch(error => log('Projektet kunde inte autosparas: '+error.message));
+  return true;
+}
+function switchProject(id) {
+  if (id === projectWorkspace.activeId || !prepareProjectSwitch()) return;
+  const entry = projectWorkspace.entries.find(entry => entry.id === id);
+  if (entry) { activateProject(entry); canvas.focus(); }
+}
+function renderProjectTabs() {
+  const tabs = $('#project-tabs');
+  const signature = JSON.stringify([projectWorkspace.activeId,projectWorkspace.entries.map(entry =>
+    [entry.id,entry.session.document.name,entry.saveState]),projectWorkspace.closed.map(entry => [entry.id,entry.name])]);
+  if (tabs.dataset.state === signature) return;
+  const focused = document.activeElement?.dataset.project;
+  tabs.replaceChildren(...projectWorkspace.entries.map(entry => {
+    const group = document.createElement('div'); group.className = 'project-tab'; group.setAttribute('role','presentation');
+    const button = document.createElement('button'); button.type = 'button';
+    button.id = 'tab-'+entry.id; button.dataset.project = entry.id;
+    button.textContent = entry.session.document.name;
+    button.title = entry.session.document.name+' · '+entry.saveState;
+    button.setAttribute('role','tab'); button.setAttribute('aria-controls','canvas');
+    button.setAttribute('aria-selected',String(entry.id === projectWorkspace.activeId));
+    button.tabIndex = entry.id === projectWorkspace.activeId ? 0 : -1;
+    button.onclick = () => switchProject(entry.id);
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'close-project';
+    close.textContent = '×'; close.title = 'Stäng projektflik';
+    close.setAttribute('aria-label','Stäng '+entry.session.document.name);
+    close.disabled = projectWorkspace.entries.length === 1;
+    close.onclick = async () => {
+      if (!prepareProjectSwitch()) return;
+      document.body.inert = true;
+      try { if (await projectWorkspace.close(entry.id)) activateProject(projectWorkspace.active); }
+      catch(error) { log('Kunde inte stänga projektfliken: '+error.message); }
+      finally { document.body.inert = false; canvas.focus(); }
+    };
+    group.append(button,close); return group;
+  }));
+  canvas.setAttribute('aria-labelledby','tab-'+projectWorkspace.activeId);
+  const reopen = $('#reopen-project');
+  reopen.hidden = !projectWorkspace.closed.length;
+  reopen.replaceChildren(new Option('Återöppna projekt…',''), ...projectWorkspace.closed.map(entry => new Option(entry.name,entry.id)));
+  tabs.dataset.state = signature;
+  if (focused) tabs.querySelector(`[data-project="${focused}"]`)?.focus();
+}
+$('#new-project-tab').onclick = () => $('#new-file').click();
+$('#reopen-project').onchange = async event => {
+  const id = event.target.value; event.target.value = '';
+  if (!id || !prepareProjectSwitch()) return;
+  document.body.inert = true;
+  try { const entry = await projectWorkspace.reopen(id); if(entry)activateProject(entry); }
+  catch(error) { log('Kunde inte återöppna projektet: '+error.message); }
+  finally { document.body.inert = false; canvas.focus(); }
+};
+$('#project-tabs').onkeydown = event => {
+  if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key) || !event.target.dataset.project) return;
+  event.preventDefault(); event.stopPropagation();
+  const entries = projectWorkspace.entries, index = entries.findIndex(entry => entry.id === event.target.dataset.project);
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? entries.length-1 :
+    (index+(event.key === 'ArrowRight' ? 1 : -1)+entries.length)%entries.length;
+  switchProject(entries[next].id);
+  $(`#tab-${projectWorkspace.activeId}`).focus();
+};
+
 const documentWorkflow = createDocumentWorkflow({
   getDocument: () => doc,
   hasBlockEdit: () => Boolean(blockEditor),
   finishText: () => finishTextEdit(true),
   finishBlock: () => finishBlockEdit(true),
   hasPendingEdit: () => Boolean(tool || textEditor.active || drag),
-  prepareOpen: () => { syncViewport(); cancel(); },
+  prepareOpen: () => { syncViewport(); cancel(false); },
   replaceDocument: (next, label) => {
-    commit(label, () => { doc = next; activeLayer = next.layers[0].id; });
-    activeSpace = "model";
-    activeViewportId = null;
-    paperCamera = null;
-    spaceCameras.clear();
-    cancel(); fit();
+    captureProjectContext();
+    const entry = projectWorkspace.add(next);
+    activateProject(entry);
+    fit();
+    entry.ready.then(() => {
+      if (!entry.storage.pending) reportProjectSave(entry,entry.saveError);
+      renderProjectTabs();
+    });
   },
   syncView: syncViewport, download,
 });
@@ -1692,7 +1825,7 @@ $("#new-file").onclick = () => {
       layers: [{ id: uid(), name: "0", color: "#c3d6ce", visible: true, locked: false }],
       entities: [],
     }, "Ny ritning")) return;
-    log("Ny ritning. Den föregående kan återställas med Ångra.");
+    log("Ny ritning öppnad i en egen projektflik.");
   } catch (error) { log(error.message); }
 };
 $("#demo-file").onclick = () => {
@@ -1738,8 +1871,8 @@ $("#export-sheet").onclick = () => {
   if (l) download(`${l.name}.svg`, layoutSVG(doc, l), "image/svg+xml");
 };
 resize();
-update();
-fit();
+activateProject(initialProject);
+if (!initialProject.context) fit();
 prompt();
 log(
   "LiraCAD 0.1 · Skriv ett kommando, välj ett verktyg eller öppna Snabbguide.",

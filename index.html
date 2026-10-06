@@ -100,7 +100,13 @@
     </div>
     <main>
       <section class="workspace" aria-label="Rityta">
+        <div class="project-bar">
+          <div id="project-tabs" role="tablist" aria-label="Projekt"></div>
+          <button id="new-project-tab" aria-label="Nytt projekt" title="Nytt projekt">+</button>
+          <select id="reopen-project" aria-label="Återöppna stängt projekt" hidden></select>
+        </div>
         <canvas
+          role="tabpanel"
           id="canvas"
           aria-label="CAD-rityta. Skriv ett kommando eller välj ett ritverktyg."
           tabindex="0"
@@ -180,7 +186,7 @@
       <section class="settings-section">
         <h3>Exempel och stresstest</h3>
         <p>Generera en ny ritning för att prova verktygen eller testa prestandan.
-          Den öppna ritningen ersätts och kan återställas med Ångra.</p>
+          Ritningen öppnas i en ny projektflik. Dina andra projekt finns kvar.</p>
         <button id="generate-example">Generera exempelritning</button>
         <label class="settings-field">Antal objekt
           <select id="stress-count">
