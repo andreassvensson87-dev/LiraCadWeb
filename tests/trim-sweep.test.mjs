@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { beginTrimSweep, moveTrimSweep, trimSweepChange } from '../src/trim-sweep.js';
+import { trimSweepCrossings } from '../src/trim-extend.js';
+import { applyEditingChange } from '../src/editing-tools.js';
+const p=(x,y)=>({x,y});
+const line=(id,a,b)=>({id,type:'line',layer:'0',points:[a,b]});
+const targets=[0,5,10].map((y,i)=>line(`t${i}`,p(0,y),p(10,y)));
+const boundary=line('boundary',p(7,-20),p(7,20));
+const context={editableEntities:targets,boundaryEntities:[...targets,boundary],pointer:p(9,-2)};
+test('fast sweep hits every crossed line in order, stages once per source and leaves inputs unchanged',()=>{
+ const before=structuredClone(context);
+ let sweep=beginTrimSweep(context,'TRIM');
+ sweep=moveTrimSweep(sweep,p(9,12),'TRIM');
+ assert.deepEqual(sweep.changes.map(c=>c.id),['t0','t1','t2']);
+ sweep=moveTrimSweep(sweep,p(9,-2),'TRIM');
+ assert.equal(sweep.changes.length,3);
+ const change=trimSweepChange(sweep);
+ const result=applyEditingChange([...targets,boundary],change);
+ for(const e of result.filter(e=>e.id!=='boundary'))assert.deepEqual(e.points,[p(0,e.points[0].y),p(7,e.points[0].y)]);
+ assert.deepEqual(context,before);assert.deepEqual(result[0],boundary);
+});
+test('Shift applies to newly crossed targets and nearest boundaries including read-only geometry',()=>{
+ const bounds=[line('near',p(15,-20),p(15,20)),line('far',p(20,-20),p(20,20)),boundary];
+ let sweep=beginTrimSweep({...context,boundaryEntities:bounds},'TRIM');
+ sweep=moveTrimSweep(sweep,p(9,2),'TRIM');
+ sweep=moveTrimSweep(sweep,p(9,12),'EXTEND');
+ assert.deepEqual(sweep.changes[0].entities[0].points,[p(0,0),p(7,0)]);
+ assert.deepEqual(sweep.changes[1].entities[0].points,[p(0,5),p(15,5)]);
+ assert.deepEqual(sweep.changes[2].entities[0].points,[p(0,10),p(15,10)]);
+ assert.ok(!sweep.changes.some(c=>c.id==='boundary'));
+});
+test('circles and bulged polyline segments use actual curves, not chords or infinite lines',()=>{
+ const circle={id:'c',type:'circle',center:p(0,0),radius:10};
+ const poly={id:'p',type:'polyline',points:[p(10,0),p(0,10)],bulges:[Math.tan(Math.PI/8)]};
+ const hits=trimSweepCrossings([circle,poly],p(7,5),p(7,10));
+ assert.equal(hits.length,2);for(const hit of hits)assert.ok(Math.abs(hit.point.y-Math.sqrt(51))<1e-7);
+ assert.deepEqual(trimSweepCrossings([circle],p(20,-20),p(20,20)),[]);
+ assert.deepEqual(trimSweepCrossings([line('short',p(0,0),p(1,0))],p(5,-1),p(5,1)),[]);
+ const sweep=moveTrimSweep(beginTrimSweep({editableEntities:[circle],boundaryEntities:[line('cut',p(5,-20),p(5,20))],pointer:p(12,-2)},'TRIM'),p(8,2),'TRIM');
+ assert.equal(sweep.changes[0].entities[0].type,'arc');
+});
+test('invalid targets are skipped, failed attempts can be retried, no-op sweep creates no change',()=>{
+ const circle={id:'circle',type:'circle',center:p(30,0),radius:2};
+ let sweep=beginTrimSweep({...context,editableEntities:[circle,...targets],pointer:p(30,-5)},'EXTEND');
+ sweep=moveTrimSweep(sweep,p(30,5),'EXTEND');assert.equal(trimSweepChange(sweep),null);
+ sweep=moveTrimSweep(sweep,p(9,-2),'TRIM');sweep=moveTrimSweep(sweep,p(9,12),'TRIM');
+ assert.equal(sweep.changes.length,3);
+ const empty=beginTrimSweep({...context,editableEntities:[]},'TRIM');assert.equal(trimSweepChange(moveTrimSweep(empty,p(9,12),'TRIM')),null);
+});

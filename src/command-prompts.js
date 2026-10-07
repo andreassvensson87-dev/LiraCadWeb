@@ -21,11 +21,9 @@ function advancedPrompt(tool, { cornerSize, chamferSize }) {
   const n = tool.name,
     p = tool.points.length;
   if (["TRIM", "EXTEND"].includes(n))
-    return tool.phase === "select"
-      ? "Välj gränser · Enter fortsätter (inga val = alla)"
-      : n === "TRIM"
-        ? "Klicka delen som ska bort · Enter avslutar"
-        : "Klicka nära änden som ska förlängas · Enter avslutar";
+    return Boolean(tool.shift)!==(n==='EXTEND')
+      ? 'Förläng: klicka nära änden eller dra över objekt · Shift växlar till trimma · Enter avslutar'
+      : 'Trimma: klicka eller dra över delen som ska bort · Shift växlar till förläng · Enter avslutar';
   if (n === "DIMCONTINUE")
     return tool.phase === "chainPick"
       ? "Välj en måttkedja eller ett linjärt mått · Enter avslutar"
@@ -80,7 +78,7 @@ export function commandPrompt(
     else if (tool.phase === "insertName") s = "Ange blocknamn";
     else if (tool.phase === "attributeName") s = "Attributnamn (t.ex. NUMMER)";
     else if (n === "BLOCK") s = "Ange blockets baspunkt";
-    else if (n === "INSERT") s = "Ange insättningspunkt";
+    else if (n === "INSERT") s = tool.catalog ? `Placera ${tool.catalog.label} · Klicka eller ange punkt · Esc avbryter` : "Ange insättningspunkt";
     else if (n === "PLINE" && p)
       s = tool.arcMode
         ? tool.arcMid

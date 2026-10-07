@@ -4,7 +4,7 @@ import { transform } from "./entity-transform.js";
 // Resolve only stored representations; never invent missing text contexts.
 export function annotationEntity(e, viewport) {
   const variant=e.annotationVariants?.find(v=>viewport?.annotationScale && Math.abs(v.denominator/viewport.annotationScale-1)<1e-8);
-  if(variant){const result={...variant.entity,id:e.id,layer:e.layer,space:e.space,...(["text","dimension"].includes(e.type)?{text:e.text}:{}),...(e.type==="block"?{values:e.values,parameterValues:e.parameterValues}:{} )};if(variant.entity.text!==e.text)delete result.textRuns;for(const key of ["hidden","color","lineType","lineWeight","cadColor7","inheritLayer"]){if(key in e)result[key]=e[key];else delete result[key];}return result;}
+  if(variant){const result={...variant.entity,id:e.id,layer:e.layer,space:e.space,...(["text","dimension"].includes(e.type)?{text:e.text}:{}),...(e.type==="block"?{values:e.values,parameterValues:e.parameterValues}:{} )};if(variant.entity.text!==e.text)delete result.textRuns;for(const key of ["hidden","color","lineType","lineWeight","cadColor7","inheritLayer","_xrefId","_xrefSnap","_xrefOpacity"]){if(key in e)result[key]=e[key];else delete result[key];}return result;}
   if(e.annotationVariants?.length && !e.annotationContexts?.length && viewport?.showAllAnnotations===false)return null;
   const contexts = e.annotationContexts;
   if (!contexts?.length || !viewport?.annotationScale) return e;

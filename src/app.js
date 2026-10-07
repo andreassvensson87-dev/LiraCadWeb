@@ -1,3 +1,4 @@
+import { createImportDialog } from "./import-dialog.js";
 import { annotationView, storeAnnotationView, createAnnotationView, plainAnnotationEntity, copyAnnotationView } from "./annotation-edit.js";
 import { loadCadFonts } from "./cad-fonts.js";
 import { cameraVector, screenPoint, worldPoint } from "./camera.js";
@@ -12,6 +13,11 @@ import { icons } from "./toolbar-icons.js";
 import { toolbarGroups, toolbarLabels } from "./toolbar-groups.js";
 import { createCommandCompletion } from "./command-completion.js";
 import { createLayerPanel } from "./layer-panel.js";
+import { createReferencePanel } from "./reference-panel.js";
+import { loadReference, referenceEntities, detachReference, bindReference, findReference } from "./references.js";
+import { resolveReferenceFiles } from "./reference-files.js";
+import { readDrawingFile } from "./file-import.js";
+import { createDetailCatalog } from "./detail-catalog.js";
 import { initializeLiraShell } from "./lira-shell.js";
 import { Editor } from "./editor.js";
 import { drawingTools } from "./drawing-tools.js";
@@ -100,7 +106,7 @@ for (const [category, groups] of Object.entries(toolbarGroups)) {
     const title=document.createElement('h3');title.textContent=heading;section.append(title);
     for (const name of commands) {
       const [,label,alias]=definitions.find(d=>d[0]===name);
-      const b=document.createElement('button');b.dataset.command=name;b.title=`${label} · ${alias}`;
+      const b=document.createElement('button');b.dataset.command=name;b.title=`${label} · ${alias}${name==='TRIM'?' · Shift växlar funktion':''}`;
       b.innerHTML=`<span class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg></span><span>${toolbarLabels[name]||label}</span>`;
       section.append(b);
     }
@@ -109,6 +115,7 @@ for (const [category, groups] of Object.entries(toolbarGroups)) {
 }
 let blockEditor = null;
 let parameterEdit = null;
+let trimShift=false;
 const projectWorkspace = new ProjectWorkspace({
   createStorage: id => new ProjectStorage(new IndexedDBProjectStore(undefined,{key:id}), {
     legacyStorage: id === 'current' ? () => localStorage : null,
@@ -182,7 +189,7 @@ const viewEntity=e=>spaceOf(e)==="model"?annotationView(e,currentViewport(),doc.
 const layerOf = (e) => doc.layers.find((l) => l.id === e.layer),
   visible = (e) =>
     !e.hidden && layerOf(e)?.visible !== false && spaceOf(e) === drawingSpace() && !(activeViewportId && doc.entities.find(v=>v.id===activeViewportId)?.frozenLayers?.includes(layerOf(e)?.name)),
-  editable = (e) => visible(e) && !layerOf(e)?.locked;
+  editable = (e) => !e._xrefId && visible(e) && !layerOf(e)?.locked;
 const world = (p) => worldPoint(p, camera, width, height);
 const screen = (p) => screenPoint(p, camera, width, height);
 
@@ -250,7 +257,7 @@ const renderLayoutProperties = createLayoutInspector({
 const blockInspector = createBlockInspector({
   refresh:()=>{renderInspector();schedule();},
   field, section, action, startParameter:request=>{parameterEdit=request||null;try{start("BSTRETCH");}finally{parameterEdit=null;}}, getDocument: () => doc, commit, finishEdit: finishBlockEdit,
-  renderAttributeManager, attributeValueField, editSelected, beginEdit: beginBlockEdit, beginAttributeEdit: beginAttributeTextEdit, erase,
+  document, renderAttributeManager, attributeValueField, editSelected, beginEdit: beginBlockEdit, renderGeneralProperties:generalProperties, erase,
 });
 const renderLayers = createLayerPanel({
   document,
@@ -271,10 +278,12 @@ const editor = new Editor({
     isBlockEditor:Boolean(blockEditor),stretchParameters:doc.stretchParameters||[],parameterEdit,
     creationDefaults,
     ...(tool && (Object.hasOwn(blockTools, tool.name)||tool.name==='WBLOCK') ? { templates: blockTemplates(doc) } : {}),
+    catalogPlacementReason: catalogPlacementReason(),
     ...(tool?.name === "MVIEW" ? { modelCenter: modelExtentsCenter(), activeViewportId } : {}),
     creation: { layer: activeLayer, space: drawingSpace(), color: creationColor, lineType: creationLineType, ...creationDefaults.dimension },
     ...(tool && ["OFFSET", "TRIM", "EXTEND", "FILLET", "CHAMFER", "PINSERT", "PDELETE", "STRETCH", "BSTRETCH", ...Object.keys(dimensionTools)].includes(tool.name) ? {
       editableEntities: (interactionEntities||doc.entities).filter(editable),
+      ...(["TRIM","EXTEND"].includes(tool.name)?{shift:trimShift,boundaryEntities:(interactionEntities||doc.entities).filter(visible).flatMap(e=>e.type==='block'?blockParts(e).filter(visible):[e])}:{}),
       hitEntity: ["TRIM", "EXTEND", "FILLET", "CHAMFER", ...Object.keys(dimensionTools)].includes(tool.name) ? hit(rawCursor) : null,
       pointer: rawCursor,
     } : {}),
@@ -311,6 +320,87 @@ const editor = new Editor({
     tool = state;
   },
 });
+let inspectorMode = "properties";
+function catalogPlacementReason() {
+  if (!projectWorkspace.active) return "Öppna eller skapa en ritning först.";
+  if (blockEditor) return "Avsluta blockeditorn först.";
+  if (drawingSpace() !== "model") return "Växla till Model för att placera en detalj.";
+  const layer = doc.layers.find(l => l.id === activeLayer);
+  return !layer || layer.locked || layer.visible === false ? "Välj ett synligt, olåst lager först." : "";
+}
+const detailCatalog = createDetailCatalog({
+  document, root: $("#catalog-panel"), getDocument: () => doc,
+  getProjectId: () => projectWorkspace.activeId, getLayer: () => activeLayer,
+  getPlacementReason: catalogPlacementReason, storage: localStorage,
+  place: (placement) => {
+    const reason = catalogPlacementReason();
+    if (reason) { log(reason); return; }
+    if (textEditor.active && !finishTextEdit(true)) return;
+    cancel(false);
+    editor.start("INSERT");
+    editor.dispatch({ type: "catalog", ...placement });
+    lastCommand = "INSERT";
+    prompt(); canvas.focus();
+  },
+});
+function referenceReason() {
+  return !projectWorkspace.active ? "Öppna eller skapa en ritning först." : blockEditor ? "Avsluta blockeditorn först." : "";
+}
+async function pickReferenceFiles({folder=false,multiple=true}={}) {
+  return new Promise(resolve=>{
+    const picker=document.createElement('input');picker.type='file';picker.accept='.dwg,.dxf,.liracad';picker.multiple=multiple;picker.hidden=true;
+    if(folder)picker.setAttribute('webkitdirectory','');
+    const finish=()=>{const files=[...picker.files];picker.remove();resolve(files);};
+    picker.onchange=finish;picker.oncancel=()=>{picker.remove();resolve([]);};
+    document.body.append(picker);picker.click();
+  });
+}
+async function readReference(id=null,{folder=false,resolveOnly=false,reloadAll=false}={}) {
+  try {
+    const reason=referenceReason();if(reason)throw Error(reason);
+    if(textEditor.active && !finishTextEdit(true))return;
+    cancel(false);
+    const previous=doc,projectId=projectWorkspace.activeId;
+    const files=await pickReferenceFiles({folder,multiple:!id});
+    if(!files.length)return;
+    const result=await resolveReferenceFiles(previous,files,{readFile:readDrawingFile,linkNew:!id && !resolveOnly && !reloadAll,reloadAll,targetId:id,onProgress:log});
+    if(doc!==previous || projectWorkspace.activeId!==projectId || blockEditor || tool || textEditor.active)throw Error('Ritningen ändrades medan referenserna lästes. Försök igen.');
+    if(result.loaded || !reloadAll)commit(reloadAll?'Ladda om alla referenser':id?'Ladda om referens':'Länka referensfiler',()=>{doc=result.document;});
+    log(`${result.loaded} ${reloadAll?(result.loaded===1?'referens uppdaterad':'referenser uppdaterade'):(result.loaded===1?"referens inläst":"referenser inlästa")}${reloadAll && result.notFound.length?` · ${result.notFound.length} filer saknas i urvalet`:''}${reloadAll && result.ambiguous.length?` · ${result.ambiguous.length} tvetydiga länkar`:''}${result.missing?` · ${result.missing} länkar behöver lösas`:''}.`);
+    for(const message of result.messages)log(message);
+  } catch(error) {if(error.name!=='AbortError')log(error.message);}
+}
+const referencePanel=createReferencePanel({
+  document,root:$('#references-panel'),getDocument:()=>doc,getProjectId:()=>projectWorkspace.activeId,getReason:referenceReason,
+  chooseFile:(id,options)=>readReference(id,options),reload:id=>readReference(id),
+  change:(id,patch,label)=>{try{if(referenceReason())throw Error(referenceReason());commit(label,draft=>{const r=findReference(draft,id);if(!r)throw Error('Referensen finns inte längre.');Object.assign(r,patch);});}catch(error){log(error.message);}},
+  detach:id=>{if(referenceReason()){log(referenceReason());return;}commit('Ta bort referens',draft=>{detachReference(draft,id);if(!draft.layers.some(l=>l.id===activeLayer))activeLayer=draft.layers[0].id;});},
+  bind:id=>{try{if(referenceReason())throw Error(referenceReason());commit('Bind referens',draft=>bindReference(draft,id,activeLayer));log('Referensen är nu ett lokalt block.');}catch(error){log(error.message);}},
+});
+function showInspector(mode) {
+  inspectorMode = mode;
+  document.body.classList.toggle("catalog-open", mode !== "properties");
+  for (const name of ["properties", "catalog", "references"]) {
+    const active = mode === name, tab = $(`#${name}-tab`);
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+    $(`#${name}-panel`).hidden = !active;
+  }
+  $(".inspector-header h1").textContent = mode === "references" ? "Referenser" : mode === "catalog" ? "Detaljkatalog" : "Egenskaper";
+  $("#selection-badge").hidden = mode !== "properties";
+  renderInspector(); resize();
+}
+for (const name of ["properties", "catalog", "references"]) {
+  const tab = $(`#${name}-tab`);
+  tab.onclick = () => showInspector(name);
+  tab.onkeydown = event => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const names = ["properties", "catalog", "references"], index = names.indexOf(name);
+    const target = event.key === "Home" ? names[0] : event.key === "End" ? names.at(-1) : names[(index + (event.key === "ArrowRight" ? 1 : 2)) % names.length];
+    showInspector(target); $(`#${target}-tab`).focus();
+  };
+}
 let textEditTarget = null;
 const textEditor = createTextEditor({
   document, screen, getSize: () => ({ width, height }),
@@ -353,7 +443,7 @@ function schedule() {
   }
 }
 function modelExtentsCenter() {
-  const es = doc.entities.filter((e) => spaceOf(e) === "model");
+  const es = [...referenceEntities(doc),...doc.entities].filter((e) => spaceOf(e) === "model" && !e.hidden && layerOf(e)?.visible!==false);
   if (!es.length) return { x: 0, y: 0 };
   const r = drawingBounds(es);
   return { x: (r.minX + r.maxX) / 2, y: (r.minY + r.maxY) / 2 };
@@ -491,9 +581,9 @@ function rebuild() {
   const space = drawingSpace();
   if (indexedDocument === doc && indexedSpace === space && interactionViewport===activeViewportId) return;
   interactionViewport=activeViewportId;
-  interactionEntities=doc.entities.map(viewEntity).filter(Boolean);
+  interactionEntities=[...referenceEntities(doc),...doc.entities].map(viewEntity).filter(Boolean);
   sceneIndex = sceneIndex ? sceneIndex.update(interactionEntities) : createSpatialIndex(interactionEntities, bounds);
-  snapCache = snapCache ? snapCache.update(interactionEntities,sceneIndex) : createLocalSnapIndex(interactionEntities,{entityIndex:sceneIndex,eligible:visible});
+  snapCache = snapCache ? snapCache.update(interactionEntities,sceneIndex) : createLocalSnapIndex(interactionEntities,{entityIndex:sceneIndex,eligible:e=>visible(e) && e._xrefSnap!==false});
   editableIds = new Set(interactionEntities.filter(editable).map(e => e.id));
   indexedDocument = doc;
   indexedSpace = space;
@@ -537,7 +627,7 @@ function showProjectSaveState(entry) {
 }
 function update() {
   renderWorkspaceState();
-  if (!projectWorkspace.active) { renderProjectTabs(); schedule(); return; }
+  if (!projectWorkspace.active) { renderProjectTabs(); renderInspector(); schedule(); return; }
   if (
     activeSpace !== "model" &&
     !doc.layouts?.some((l) => l.id === activeSpace)
@@ -566,7 +656,7 @@ function update() {
   $("#selection-badge").textContent = selection.size;
   $("#undo").disabled = !history.past.length;
   $("#redo").disabled = !history.future.length;
-  $("#layer-count").textContent = doc.layers.length;
+  $("#layer-count").textContent = `${doc.layers.length} lager`;
   renderInspector();
   renderLayers();
   schedule();
@@ -751,13 +841,14 @@ const gridStep = () => gridSpacing(camera.scale);
 function render() {
   const gripPreviews = drag?.kind === "grip" ? moveGripTargets(drag.targets, cursor) : [];
   renderScene({
-    doc, camera, paperCamera, width, height, dpr, activeSpace, activeViewportId,
+    doc: {...doc, entities: interactionEntities || doc.entities}, camera, paperCamera, width, height, dpr, activeSpace, activeViewportId,
     selection, hover, tool, cursor, mouse, showGrid, drag, trackAnchors, snap,
     previews: previewEntities(), gripPreviews,
     blockParameter:blockEditor?blockInspector.getActiveParameter():null,
     textReplacement: textEditPreview(),
     movedViewport: drag?.kind === "viewportMove" && drag.moved ? movedViewport() : null,
-    previewTarget: tool && ["TRIM", "EXTEND"].includes(tool.name) && tool.phase === "trimPick" && editor.preview(cursor).length
+    previewTargets: tool?.sweep?.changes.map(change=>change.id) || [],
+    previewTarget: !tool?.sweep && tool && ["TRIM", "EXTEND"].includes(tool.name) && tool.phase === "trimPick" && editor.preview(cursor).length
       ? hit(rawCursor)?.id : null,
     editableIds, sceneIndex, interactionEntities, navigating: doc.entities.length > 2000 && performance.now() < navigationDeadline,
   });
@@ -777,14 +868,15 @@ function prompt() {
     : commandPrompt(tool);
   $("#command-label").textContent = tool ? tool.name : "Kommando";
   input.placeholder = s || "Skriv ett kommando…";
-  $("#status-mode").textContent = tool
-    ? definitions.find((d) => d[0] === tool.name)?.[1] || tool.name
+  $("#status-mode").textContent = tool?.catalog ? `Placera ${tool.catalog.label}` : tool
+    ? tool.name==='EXTEND'?'Trimma / Förläng':definitions.find((d) => d[0] === tool.name)?.[1] || tool.name
     : "Redo";
+  const toolbarCommand=tool?.name==='EXTEND'?'TRIM':tool?.name;
   $$("[data-command]").forEach((b) => {
-    b.classList.toggle("active", b.dataset.command === tool?.name);
+    b.classList.toggle("active", b.dataset.command === toolbarCommand);
     b.classList.toggle(
       "selected",
-      b.dataset.command === (tool?.name || "SELECT"),
+      b.dataset.command === (toolbarCommand || "SELECT"),
     );
   });
   canvas.style.cursor = tool?.name === "PAN" ? "grab" : "crosshair";
@@ -954,6 +1046,7 @@ function start(name) {
   }
   if (editor.supports(name)) {
     editor.start(name);
+    if(['TRIM','EXTEND'].includes(name))selection.clear();
     if (["JOIN", "EXPLODE"].includes(name) && selectedEntities().length)
       dispatchEditor({ type: "text", text: "" });
   }
@@ -1224,6 +1317,7 @@ canvas.addEventListener("pointerdown", (ev) => {
     finishTextEdit(true);
     return;
   }
+  setTrimShift(ev.shiftKey);
   moveCursor(ev);
   if (activeViewportId && !inActiveViewport(mouse)) {
     leaveViewport();
@@ -1293,6 +1387,11 @@ canvas.addEventListener("pointerdown", (ev) => {
     drag={kind:"stretchWindow",start:{...mouse}};
     acceptPoint(rawCursor);schedule();return;
   }
+  if (tool && ["TRIM", "EXTEND"].includes(tool.name)) {
+    drag = { kind: "trimSweep", pointerId: ev.pointerId };
+    dispatchEditor({ type: "sweepStart" });
+    prompt(); schedule(); return;
+  }
   if (tool && tool.phase !== "select") {
     acceptPoint(cursor);
     schedule();
@@ -1307,12 +1406,14 @@ for (const name of ["mousedown", "auxclick"]) {
   });
 }
 canvas.addEventListener("pointermove", (ev) => {
+  setTrimShift(ev.shiftKey);
   moveCursor(ev);
   if (drag?.kind === "pan") {
     navigating();
     const delta = cameraVector(camera, -(mouse.x - drag.start.x) / camera.scale, (mouse.y - drag.start.y) / camera.scale);
     camera.x = drag.camera.x + delta.x; camera.y = drag.camera.y + delta.y;
-  } else if(drag?.kind==='select')drag=moveSelectionGesture(drag,mouse);
+  } else if(drag?.kind==='trimSweep')dispatchEditor({type:"sweepMove"});
+  else if(drag?.kind==='select')drag=moveSelectionGesture(drag,mouse);
   else if(drag?.kind==='viewportMove')drag.moved = dist(mouse, drag.start) > 4;
   else if (!tool && !drag) {
     const e = hit(rawCursor);
@@ -1325,7 +1426,13 @@ canvas.addEventListener("pointermove", (ev) => {
 canvas.addEventListener("pointerup", (ev) => {
   if (!drag) return;
   moveCursor(ev);
-  if(drag.kind === "stretchWindow") {
+  if(drag.kind === "trimSweep") {
+    setTrimShift(ev.shiftKey);
+    dispatchEditor({ type: "sweepEnd" });
+    // A rejected commit must not leave a staged preview behind.
+    if (tool?.sweep) dispatchEditor({ type: "sweepCancel" });
+    prompt();
+  } else if(drag.kind === "stretchWindow") {
     if(dist(mouse,drag.start)>4 && tool?.phase === "window")acceptPoint(rawCursor);
   } else if (drag.kind === "viewportMove") {
     if (dist(mouse, drag.start) > 4) {
@@ -1370,7 +1477,15 @@ canvas.addEventListener("pointerup", (ev) => {
   canvas.style.cursor = tool?.name === "PAN" ? "grab" : "crosshair";
   update();
 });
+function cancelTrimSweep() {
+  if (tool?.sweep) dispatchEditor({ type: "sweepCancel" });
+}
+canvas.addEventListener("lostpointercapture", () => {
+  if(drag?.kind !== "trimSweep")return;
+  cancelTrimSweep(); drag=null; schedule();
+});
 canvas.addEventListener("pointercancel", () => {
+  cancelTrimSweep();
   drag = null;
   canvas.style.cursor = "crosshair";
   schedule();
@@ -1463,6 +1578,7 @@ input.addEventListener("keydown", (ev) => {
     ev.preventDefault();
 });
 document.addEventListener("keydown", (ev) => {
+  if(ev.key==='Shift')setTrimShift(true);
   if (!projectWorkspace.active) return;
   const editing = ev.target.matches(
     "input,select,textarea,[contenteditable=true]",
@@ -1532,6 +1648,7 @@ document.addEventListener("keydown", (ev) => {
   }
 });
 document.addEventListener("keyup", (ev) => {
+  if(ev.key==='Shift')setTrimShift(false);
   if (ev.code === "Space") {
     const shouldSubmit = space && !spaceUsed;
     space = false;
@@ -1539,12 +1656,21 @@ document.addEventListener("keyup", (ev) => {
   }
 });
 window.addEventListener("blur", () => {
+  cancelTrimSweep();
+  setTrimShift(false);
   space = false;
   drag = null;
   mouse = { x: -1, y: -1 };
   acquireTrack(null);
   schedule();
 });
+function setTrimShift(value){
+  if(trimShift===!!value)return;
+  trimShift=!!value;
+  if(editor.owns(tool) && ['TRIM','EXTEND'].includes(tool.name)){
+    dispatchEditor({type:'modifier',shift:trimShift});prompt();schedule();
+  }
+}
 function toggle(kind) {
   if (kind === "snap") osnap = !osnap;
   if (kind === "ortho") {
@@ -1596,9 +1722,13 @@ function creationInspector(root) {
     );
 }
 function renderInspector() {
+  if (inspectorMode === "catalog") { detailCatalog.refresh(); return; }
+  if (inspectorMode === "references") { referencePanel.refresh(); return; }
   const root = $("#properties-panel");
   root.replaceChildren();
-  generalProperties(root);
+  const es = selectedEntities();
+  const creating=tool && !transforms.includes(tool.name) && !['ERASE','OFFSET','JOIN','EXPLODE','PINSERT','PDELETE','FILLET','CHAMFER'].includes(tool.name);
+  if(blockEditor || creating || es.length!==1 || es[0].type!=='block')generalProperties(root);
   if (blockEditor) blockInspector.renderEditor(root);
   if (
     tool &&
@@ -1617,7 +1747,6 @@ function renderInspector() {
     creationInspector(root);
     return;
   }
-  const es = selectedEntities();
   if (!es.length) {
     if (activeSpace !== "model" && !activeViewportId)
       renderLayoutProperties(root, activeSpace);
@@ -1950,35 +2079,43 @@ function exportDxf() {
   try {
     if (!documentWorkflow.exportDXF()) return;
     log("DXF exporterad · block, attribut, bågpolylinjer och native mått bevaras.");
+    if(doc.references?.length)log('Xref-länkar exporterade. Skicka med källfilerna. Referenser från DXF/LiraCAD behöver bindas eller sparas som DWG för AutoCAD.');
   } catch (error) { log(`Kunde inte exportera: ${error.message}`); }
 }
 $("#save-file").onclick = saveProject;
 $("#export-dxf").onclick = exportDxf;
 $("#open-file").onclick = () => $("#file-input").click();
-$("#close-import").onclick = () => $("#import-dialog").close();
+const importDialog = createImportDialog({ document, download });
 async function openDrawingFile(f) {
+  const cad = /\.(dwg|dxf)$/i.test(f.name);
+  const startedAt = new Date().toISOString(), started = performance.now();
+  const events = [];
+  const record = (level, message, details) => {
+    if (events.length < 5000) events.push({ time: new Date().toISOString(), level, message, ...(details ? { details } : {}) });
+  };
+  const session = (result, error) => ({
+    file: f, source: { name: f.name, size: f.size, lastModified: f.lastModified },
+    startedAt, durationMs: Math.round(performance.now() - started), appVersion: '0.1.0',
+    environment: { userAgent: navigator.userAgent, language: navigator.language },
+    count: result?.imported?.count || 0, issues: result?.imported?.report || [],
+    events, error: error ? { message: error.message, stack: error.stack } : null,
+    limitations: ['DWG-läsaren returnerar högst 200 unika meddelanden.', 'Importloggens händelser begränsas till 5000.'],
+  });
+  try {
     const result = await documentWorkflow.open(f, {
-      onProgress: log,
+      onProgress: message => { log(message); record('progress', message); },
+      onDiagnostic: diagnostic => record(diagnostic.level || 'info', diagnostic.message, diagnostic.details),
     });
     if (!result) return false;
-    const { imported } = result;
     log(`Öppnat ${f.name}`);
-    if (imported) {
-      $("#import-dialog h2").textContent = /\.dwg$/i.test(f.name)
-        ? "DWG-import"
-        : "DXF-import";
-      $("#import-summary").textContent =
-        `${imported.count} objekt inlästa. ${imported.report.length ? "Följande avvikelser hittades:" : "Inga kända importavvikelser hittades."}`;
-      $("#import-issues").replaceChildren(
-        ...imported.report.map((item) => {
-          const li = document.createElement("li");
-          li.textContent = `${item.message} (${item.count})`;
-          return li;
-        }),
-      );
-      $("#import-dialog").showModal();
-    }
+    if (result.imported) importDialog.show(session(result));
+  } catch (error) {
+    record('error', error.message, error.stack);
+    if (cad) importDialog.show(session(null, error));
+    throw error;
+  }
 }
+
 const fileOpenQueue = createFileOpenQueue({
   openFile: openDrawingFile,
   canOpen: () => !blockEditor && !documentWorkflow.opening,

@@ -1,4 +1,21 @@
 import { number } from "./geometry.js";
+import { aciColors } from "./dxf-colors.js";
+
+const aciNames = [
+  "Röd", "Gul", "Grön", "Cyan", "Blå", "Magenta", "Vit", "Grå", "Ljusgrå",
+];
+// Import and picker share RGB values. Duplicate ACI values use the first name,
+// since document colors are stored as RGB rather than as palette indices.
+const standardColors = [];
+const seenColors = new Set();
+for (let index = 1; index < aciColors.length; index++) {
+  const color = aciColors[index];
+  if (seenColors.has(color)) continue;
+  seenColors.add(color);
+  const name = aciNames[index - 1] || (index === 30 ? "Orange" : color === "#000000" ? "Svart" : null);
+  standardColors.push([name ? `${name} (ACI ${index})` : `ACI ${index}`, color]);
+}
+
 // Reusable controls emit callbacks; document mutations belong to their caller.
 export function createInspectorControls({ document, onInvalid }) {
   function field(label, value, change, type = "number") {
@@ -84,18 +101,6 @@ export function createInspectorControls({ document, onInvalid }) {
     button.onclick = fn;
     return button;
   }
-  const standardColors = [
-    ["Röd", "#ff0000"],
-    ["Orange", "#ff8000"],
-    ["Gul", "#ffff00"],
-    ["Grön", "#00cc00"],
-    ["Cyan", "#00ffff"],
-    ["Blå", "#0000ff"],
-    ["Magenta", "#ff00ff"],
-    ["Vit", "#ffffff"],
-    ["Grå", "#808080"],
-    ["Svart", "#000000"],
-  ];
   function colorFields(root, value, layerColor, change) {
     const standard = standardColors.find(
       ([, color]) => color === value?.toLowerCase(),
@@ -131,8 +136,9 @@ export function createInspectorControls({ document, onInvalid }) {
     const entries = [
       ...(value === "mixed" ? [["mixed", "Blandat", null]] : []),
       ["layer", "Enligt lager", layerColor],
-      ...standardColors.map(([name, color]) => [color, name, color]),
+      ...standardColors.filter(([name]) => !name.startsWith("ACI ")).map(([name, color]) => [color, name, color]),
       ["custom", "Egen kulör…", selected === "custom" ? value : null],
+      ...standardColors.filter(([name]) => name.startsWith("ACI ")).map(([name, color]) => [color, name, color]),
     ];
     const contents = (element, name, color) => {
       const swatch = document.createElement("span");

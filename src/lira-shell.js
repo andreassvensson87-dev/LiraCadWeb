@@ -104,8 +104,12 @@ export function initializeLiraShell() {
       more.className = "lira-more";
       const summary = document.createElement("summary");
       summary.textContent = "Arkiv";
+      const chevron = document.createElement("span");
+      chevron.textContent = "▾";
+      chevron.setAttribute("aria-hidden", "true");
+      summary.append(chevron);
       more.append(summary, history);
-      header.insertBefore(more, header.querySelector(".document-name"));
+      header.prepend(more);
     }
     const layers = rail.querySelector("#layers-tab");
     if (layers) decorate(layers, "layers", "Lager");
@@ -151,6 +155,7 @@ export function initializeLiraShell() {
     toggle.className = "lira-inspector-toggle";
     toggle.type = "button";
     toggle.setAttribute("aria-controls", inspector.id);
+    const childVisibility = new Map();
     const update = (collapsed) => {
       document.body.classList.toggle("lira-inspector-collapsed", collapsed);
       toggle.setAttribute("aria-expanded", String(!collapsed));
@@ -163,8 +168,14 @@ export function initializeLiraShell() {
       inspector.querySelector(".inspector-header").append(toggle);
       inspector.hidden = false;
       for (const child of inspector.children) {
-        if (!child.classList.contains("inspector-header"))
-          child.hidden = collapsed;
+        if (child.classList.contains("inspector-header")) continue;
+        if (collapsed) {
+          childVisibility.set(child, child.hidden);
+          child.hidden = true;
+        } else if (childVisibility.has(child)) {
+          child.hidden = childVisibility.get(child);
+          childVisibility.delete(child);
+        }
       }
       window.dispatchEvent(new Event("resize"));
     };

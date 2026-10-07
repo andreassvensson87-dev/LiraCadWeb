@@ -40,6 +40,7 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
   function paintEntities(space, onPaper = false, interactive = true, additions = null, viewport = null) {
     paintingPaper = onPaper;
     const { doc, width, height, selection, hover } = frame;
+    const previewTargets = new Set(interactive && space === drawingSpace() ? frame.previewTargets || [] : []);
     const previewTarget = interactive && space === drawingSpace() ? frame.previewTarget : null;
     const tl = world({ x: 0, y: 0 }),
       br = world({ x: width, y: height });
@@ -54,7 +55,7 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
     }
     for (const e of [...entities.filter(e => e.id !== replacement?.originalId), ...(replacement ? [replacement.entity] : [])]) {
       if (
-        e.id === previewTarget ||
+        e.id === previewTarget || previewTargets.has(e.id) ||
         spaceOf(e) !== space ||
         layerOf(e)?.visible === false ||
         e.type === "viewport"
@@ -70,7 +71,8 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
             ? "#35836b"
             : "#e3f4d7"
           : onPaper ? paperColor(e,layerOf(e),frame.doc.layouts.find(l=>l.id===frame.activeSpace)?.monochrome) : e.color || layerOf(e).color;
-      drawEntity(e, color, selected);
+      if (e._xrefOpacity != null) { ctx.save(); ctx.globalAlpha = (typeof ctx.globalAlpha === 'number' ? ctx.globalAlpha : 1) * e._xrefOpacity; drawEntity(e, color, selected); ctx.restore(); }
+      else drawEntity(e, color, selected);
     }
   }
   function paintLayout() {
@@ -144,7 +146,7 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
     try {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
-      const key = [spatial, JSON.stringify(doc.layers), camera.x, camera.y, camera.scale, width, height, dpr, showGrid, frame.hover, [...selection].join(','), frame.previewTarget, camera.rotation || 0, JSON.stringify(frame.textReplacement)];
+      const key = [spatial, JSON.stringify(doc.layers), camera.x, camera.y, camera.scale, width, height, dpr, showGrid, frame.hover, [...selection].join(','), frame.previewTarget, (frame.previewTargets || []).join(','), camera.rotation || 0, JSON.stringify(frame.textReplacement)];
       const stableScene = backgroundKey?.every((value,i)=>i >= 2 && i <= 4 || value === key[i]);
       const ratio = backgroundCamera ? camera.scale / backgroundCamera.scale : 1;
       const dx = backgroundCamera ? width/2*(1-ratio) + (backgroundCamera.x-camera.x)*camera.scale : 0;
@@ -210,6 +212,12 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
           ctx.rect(r.x, r.y, r.w, r.h);
           ctx.clip();
         }
+      }
+      for (const r of doc.references || []) {
+        if (r.geometry.length || r.sourceLoaded || r.visible===false || (r.space || 'model')!==drawingSpace() || layers.get(r.layer)?.visible===false) continue;
+        const p=screen(r.point);
+        ctx.save();ctx.strokeStyle='#e3ae56';ctx.fillStyle='#e3ae56';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+        ctx.strokeRect(p.x-8,p.y-8,16,16);ctx.font='11px system-ui';ctx.fillText(`${r.name} · Saknas`,p.x+13,p.y+4);ctx.restore();
       }
       if (!tool && !frame.textReplacement) {
         for (const e of (selection.size ? frame.interactionEntities||doc.entities : []).filter(

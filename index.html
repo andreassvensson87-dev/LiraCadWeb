@@ -27,7 +27,7 @@
         <button id="update-app" hidden>Ny version – uppdatera</button>
         <button id="settings-button">Inställningar</button>
         <button id="queued-files" hidden>Öppna väntande filer</button>
-        <button id="open-file">Öppna projekt</button
+        <button id="last-import" hidden>Importrapport</button><button id="open-file">Öppna projekt</button
         ><button id="save-file">Spara projekt</button
         ><button class="primary" id="export-dxf">
           Exportera DXF <span>↗</span>
@@ -186,13 +186,20 @@
         </div>
       </section>
       <aside>
+        <div class="inspector-tabs" role="tablist" aria-label="Sidopanel">
+          <button id="properties-tab" type="button" role="tab" aria-selected="true" aria-controls="properties-panel">Egenskaper</button>
+          <button id="catalog-tab" type="button" role="tab" aria-selected="false" aria-controls="catalog-panel" tabindex="-1">Katalog</button>
+          <button id="references-tab" type="button" role="tab" aria-selected="false" aria-controls="references-panel" tabindex="-1">Referenser</button>
+        </div>
         <div class="inspector-header">
           <div>
             <h1>Egenskaper</h1>
           </div>
           <span class="selection-badge" id="selection-badge">0</span>
         </div>
-        <div id="properties-panel"></div>
+        <div id="properties-panel" role="tabpanel" aria-labelledby="properties-tab"></div>
+        <div id="catalog-panel" role="tabpanel" aria-labelledby="catalog-tab" hidden></div>
+        <div id="references-panel" role="tabpanel" aria-labelledby="references-tab" hidden></div>
 
         <div class="inspector-foot">
           <span class="live-dot"></span>
@@ -274,11 +281,20 @@
         <p id="generation-status" role="status" aria-live="polite"></p>
       </section>
     </dialog>
-    <dialog id="import-dialog" aria-label="Importresultat">
-      <h2>DXF-import</h2>
-      <p id="import-summary"></p>
-      <ul id="import-issues"></ul>
-      <form method="dialog"><button id="close-import">Stäng</button></form>
+    <dialog id="import-dialog" aria-labelledby="import-title">
+      <div class="import-heading"><span id="import-icon" aria-hidden="true">✓</span><div><h2 id="import-title">DWG öppnad</h2><p id="import-filename"></p></div><button id="dismiss-import" aria-label="Stäng importrapport">×</button></div>
+      <p id="import-status" role="status"></p>
+      <section id="import-details" hidden>
+        <p id="import-summary"></p>
+        <h3>Importdetaljer</h3><ul id="import-issues"></ul>
+        <details><summary>Visa teknisk logg</summary><pre id="import-log"></pre></details>
+        <div class="import-support"><h3>Dela underlag för felsökning</h3><p>Spara logg och ritning i en enda ZIP-fil.</p>
+          <label><input id="include-import-file" type="checkbox" checked> <span id="include-import-label">Inkludera original-DWG</span></label>
+          <button id="save-import-package">↓ Spara felsökningspaket</button>
+          <p>Sparas på din dator. Du delar filen själv.</p><p id="import-package-status" role="status"></p>
+        </div>
+      </section>
+      <div class="import-footer"><button id="toggle-import-details" aria-expanded="false" aria-controls="import-details">Visa detaljer</button><button class="primary" id="close-import" autofocus>Fortsätt till ritningen</button></div>
     </dialog>
     <dialog id="layer-dialog" aria-label="Lagereditor">
       <div class="layer-dialog-header">

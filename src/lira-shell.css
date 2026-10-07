@@ -35,6 +35,36 @@ body[data-lira-app] > header {
     "Segoe UI",
     sans-serif;
 }
+body[data-lira-app="cad"] > header {
+  justify-content: flex-start;
+}
+body[data-lira-app="cad"] > header .document-name {
+  margin-left: auto;
+  margin-right: auto;
+}
+body[data-lira-app="cad"] > header .lira-more {
+  flex-shrink: 0;
+}
+body[data-lira-app="cad"] > header .lira-more > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid #42545a;
+  border-radius: 5px;
+  list-style: none;
+}
+body[data-lira-app="cad"] > header .lira-more > summary::-webkit-details-marker {
+  display: none;
+}
+body[data-lira-app="cad"] > header .lira-more > summary:hover,
+body[data-lira-app="cad"] > header .lira-more[open] > summary {
+  background: #2c444a;
+}
+body[data-lira-app="cad"] > header .lira-more > summary:focus-visible {
+  outline: 2px solid #15946d;
+  outline-offset: 2px;
+}
 body[data-lira-app] > header .brand {
   display: flex;
   align-items: center;

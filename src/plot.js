@@ -1,3 +1,4 @@
+import { referenceEntities } from "./references.js";
 import { viewportEntities } from "./annotation-context.js";
 import { textLayout, textEmSize, fontFamily } from "./text.js";
 import { cadFontSvgStyle, usesIsoFont } from "./cad-fonts.js";
@@ -79,7 +80,7 @@ export function layoutSVG(doc, layout) {
     }
     return `<path d="${path}" ${stroke}/>`;
   };
-  const modelEntities = doc.entities
+  const modelEntities = [...referenceEntities(doc,{fade:false}),...doc.entities]
     .filter((e) => spaceOf(e) === "model");
   const viewports = doc.entities
     .filter(

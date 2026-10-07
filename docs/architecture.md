@@ -133,10 +133,21 @@ markering och fasbyte; verktyget hanterar inte DOM eller fokus självt.
 - OFFSET väljer källobjekt, tar ett positivt avstånd eller två mätpunkter och
   skapar kopior på vald sida. Kommandot avslutas efter lyckad kopiering. Ett
   ogiltigt resultat avvisar hela urvalet. Källornas egenskaper bevaras.
-- TRIM och EXTEND bekräftar gränser med Enter; ett tomt urval använder alla
-  redigerbara linjer, polylinjer, bågar och cirklar. Varje klick använder rå
-  musposition och skapar en egen historikpost. Delade gränser får uppdaterade ID
-  först efter godkänd transaktion. Enter avslutar och rensar markeringen.
+- **Trimma / Förläng** startar direkt utan gränsurval. TRIM/TR trimmar den
+  klickade delen; Shift förlänger närmaste ände till första skärningen längs
+  objektets riktning. EXTEND/EX finns kvar med omvänd grundfunktion. Alla synliga
+  linjer, polylinjer, bågar och cirklar i aktivt utrymme används som gränser,
+  inklusive låsta lager, blockdelar och referenser. Dolda och frysta objekt
+  utesluts. Bara redigerbara objekt kan ändras. Cirklar trimmas till ARC mellan två skärningar. Bågpolylinjer
+  trimmas efter båglängd och behåller exakta bulges; förlängning följer ändsegmentets
+  linje eller cirkel. Cirklar och slutna polylinjer kan inte förlängas. Preview och klick använder samma geometri och rå musposition.
+  Vänster musknapp startar ett tillfälligt svep; analytiska skärningar längs varje
+  musförflyttning fångar även objekt mellan pointer-event. Varje ursprungligt objekt
+  ändras högst en gång mot gränserna från svepets början. Alla ersättningar visas
+  tillfälligt och publiceras i en transaktion vid pointerup. Esc, pointercancel,
+  lostpointercapture och fönsterblur kastar förhandsvisningen. Ett ångra återställer
+  hela svepet. Enter/Esc avslutar verktyget. Shift uppdaterar
+  förhandsvisning och prompt direkt, och återställs när fönstret tappar fokus.
 
 - FILLET/CHAMFER tar radie respektive ett/två fasavstånd. Två förvalda linjer
   bearbetas direkt efter måttinmatning; annars väljs två linjer med klick på

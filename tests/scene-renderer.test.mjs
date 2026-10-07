@@ -119,3 +119,24 @@ test('paper and clipped model views render transient text without changing the d
   const c=canvas();createSceneRenderer(c)(f);assert.equal(c.calls.filter(([name,text])=>name==='fillText'&&text==='Draft').length,1);assert.equal(c.calls.filter(([name,text])=>name==='fillText'&&text==='Old').length,0);
  }
 });
+
+test('reference geometry is faded independently of host objects and canvas alpha is restored',()=>{
+  const ref=line('xref',[{x:0,y:0},{x:10,y:0}],{_xrefOpacity:.4,_xrefId:'reference'});
+  const own=line('own',[{x:0,y:10},{x:10,y:10}]);
+  const c=canvas();c.ctx.globalAlpha=1;createSceneRenderer(c)(frame([ref,own]));
+  const strokes=c.calls.filter(([name])=>name==='stroke');assert.equal(strokes[0].at(-1).globalAlpha,.4);assert.equal(strokes[1].at(-1).globalAlpha,1);assert.equal(c.stack.length,0);
+});
+
+test('sweep hides all staged originals and invalidates the background cache as targets change',()=>{
+ const c=canvas();let copies=0;
+ const image={width:400,height:300,getContext:()=>({clearRect(){},drawImage(){copies++;}})};
+ const render=createSceneRenderer({ctx:c.ctx,createCanvas:()=>image});
+ const f=frame([line('a',[{x:0,y:0},{x:10,y:0}]),line('b',[{x:0,y:10},{x:10,y:10}])]);
+ render(f);assert.equal(copies,1);
+ f.previewTargets=['a'];f.previews=[line('a',[{x:0,y:0},{x:5,y:0}])];
+ c.calls.length=0;render(f);assert.equal(copies,2);assert.equal(c.calls.filter(([name])=>name==='stroke').length,2);
+ f.previewTargets=['a','b'];f.previews.push(line('b',[{x:0,y:10},{x:5,y:10}]));
+ c.calls.length=0;render(f);assert.equal(copies,3);assert.equal(c.calls.filter(([name])=>name==='stroke').length,2);
+ f.previewTargets=[];f.previews=[];
+ c.calls.length=0;render(f);assert.equal(copies,4);assert.equal(c.calls.filter(([name])=>name==='stroke').length,2);
+});

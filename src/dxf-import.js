@@ -114,6 +114,7 @@ export function importDXF(text, name = "Importerad ritning") {
     entities: [],
     layouts: [],
     blocks: [],
+    references: [],
   };
   const tables = sections.get("TABLES") || [],
     objects = sections.get("OBJECTS") || [];
@@ -427,6 +428,17 @@ export function importDXF(text, name = "Importerad ritning") {
       const sx = num(r, 41, 1),
         sy = num(r, 42, 1);
       if (!sx || !sy) throw Error("Blockets skala är noll");
+      const external = blocks.get(get(r,2));
+      if (external && (num(external.header,70) & 12)) {
+        if (inBlock) { warn(`Nästlad extern referens ${get(r,2)} behöver länkas i källritningen`); return null; }
+        if (Math.abs(Math.abs(sy)-Math.abs(sx))>1e-8) throw Error('Olikformigt skalad extern referens stöds inte');
+        const path=unicode(get(external.header,1)), blockName=unicode(get(r,2));
+        const reference={id:uid(),name:path.split(/[\\/]/).at(-1)||blockName,path,kind:num(external.header,70)&8?'overlay':'attach',point:pt(r),scale:Math.abs(sx),rotation:rad(num(r,50))+(sx<0?Math.PI:0),mirrored:sx*sy<0,fade:60,snap:true,visible:!common.hidden,loaded:true,geometry:[],space:common.space,layer:common.layer};
+        if(num(r,230,1)<0){reference.point.x=-reference.point.x;reference.rotation=Math.PI-reference.rotation;reference.mirrored=!reference.mirrored;}
+        doc.references.push(reference);
+        warn(`Extern referens ${blockName} (${path}) sparades som länk; välj Byt fil i Referenser för att läsa in den`);
+        return null;
+      }
       const def = definition(get(r, 2));
       if (Math.abs(Math.abs(sy) - Math.abs(sx)) > 1e-8) {
         warn("Olikformigt skalat block förenklades till redigerbar geometri");
@@ -668,6 +680,9 @@ export function importDXF(text, name = "Importerad ritning") {
     if (!overlaps) warn(`Layout ${doc.layouts.find(l => l.id === e.space)?.name || ""}: viewportens sparade vy ligger utanför tillgänglig synlig modellgeometri; kontrollera originalritningens vy och externa referenser`);
   }
   const header = (sections.get("HEADER") || []).flat();
+  const baseIndex=header.findIndex(([c,v])=>c===9 && v==='$INSBASE');
+  if(baseIndex>=0){const values=[];for(let i=baseIndex+1;i<header.length && header[i][0]!==9;i++)values.push(header[i]);doc.insertionBase=pt(values);}
+  for(const r of doc.references){const paper=paperTransforms.get(r.space);if(paper){r.point={x:r.point.x*paper.scale+paper.x,y:r.point.y*paper.scale+paper.y};r.scale*=paper.scale;}}
   const unitsIndex = header.findIndex(([c, v]) => c === 9 && v === "$INSUNITS");
   const units = unitsIndex < 0 ? 0 : Number(header[unitsIndex + 1]?.[1]);
   if (units !== 4)
@@ -676,7 +691,7 @@ export function importDXF(text, name = "Importerad ritning") {
     );
   if (!validDocument(doc))
     throw Error("DXF-innehållet kunde inte omvandlas till en giltig ritning.");
-  if (!doc.entities.length)
+  if (!doc.entities.length && !doc.references.length)
     throw Error(
       "Inga stödda objekt hittades. " +
         [...issues.keys()].slice(0, 6).join(" · "),

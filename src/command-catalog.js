@@ -29,7 +29,7 @@ export const definitions = [
   ["DIMRADIUS", "Radiemått", "DRA"],
   ["DIMDIAMETER", "Diametermått", "DDI"],
   ["DIMCONTINUE", "Kedjemått", "DCO"],
-  ["TRIM", "Trimma", "TR"],
+  ["TRIM", "Trimma / Förläng", "TR"],
   ["EXTEND", "Förläng", "EX"],
   ["MVIEW", "Skapa viewport", "MV"],
   ["BLOCK", "Skapa block", "B"],

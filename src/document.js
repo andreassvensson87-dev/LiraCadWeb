@@ -61,6 +61,21 @@ export function validDocument(d) {
       }))
   )
     return false;
+  if (d.insertionBase != null && (!d.insertionBase || !Number.isFinite(d.insertionBase.x) || !Number.isFinite(d.insertionBase.y) || Math.abs(d.insertionBase.x)>=1e12 || Math.abs(d.insertionBase.y)>=1e12)) return false;
+  if (d.references != null) {
+    const seen=new Set();let count=0;
+    function check(refs,depth=0){
+      if(!Array.isArray(refs) || depth>16)return false;
+      for(const r of refs){
+      if (!r || typeof r.id !== 'string' || !r.id || typeof r.name !== 'string' || !r.name || r.name.length > 256 || /[\r\n]/.test(r.name) || typeof r.path !== 'string' || r.path.length > 4096 || /[\r\n]/.test(r.path) || !['overlay','attach'].includes(r.kind) || !r.point || !Number.isFinite(r.point.x) || !Number.isFinite(r.point.y) || Math.abs(r.point.x)>=1e12 || Math.abs(r.point.y)>=1e12 || !Number.isFinite(r.rotation) || !Number.isFinite(r.scale) || r.scale<=0 || !Number.isFinite(r.fade) || r.fade<0 || r.fade>90 || !Array.isArray(r.geometry) || r.geometry.some(e=>!e || ['block','viewport'].includes(e.type)) || ['visible','loaded','snap','mirrored','sourceLoaded'].some(k=>r[k]!=null && typeof r[k]!=='boolean') || r.loadedAt!=null && (!Number.isFinite(r.loadedAt) || r.loadedAt<0) || r.layer!=null && !d.layers.some(l=>l.id===r.layer) || r.space && r.space!=='model' && !d.layouts?.some(l=>l.id===r.space)) return false;
+        if(seen.has(r.id) || seen.size>=1000 || r.problem!=null && !['cycle','ambiguous','depth'].includes(r.problem) || r.sourcePath!=null && (typeof r.sourcePath!=='string' || r.sourcePath.length>4096 || /[\r\n]/.test(r.sourcePath)))return false;
+        seen.add(r.id);count+=r.geometry.length;
+        if(count>MAX_DOCUMENT_ENTITIES || !validDocument({version:1,layers:d.layers,entities:r.geometry}) || r.children!=null && !check(r.children,depth+1))return false;
+      }
+      return true;
+    }
+    if(!check(d.references))return false;
+  }
   const ids = new Set(),
     ls = new Set();
   for (const l of d.layers) {

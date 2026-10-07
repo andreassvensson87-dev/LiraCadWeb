@@ -59,7 +59,7 @@ export function toDXF(doc) {
       if (e.type === "block") {
         for (const part of Object.values(e.attributeOverrides || {})) { textStyleName(part); lineTypeName(part); }
         const definition=e.definition.stretchParameters?.length?{...e.definition,entities:evaluatedBlockEntities({...e,attributeOverrides:{}})}:e.definition;
-        const key = JSON.stringify(definition);
+        const key = JSON.stringify([definition,e._externalReference?.path,e._externalReference?.kind]);
         if (!definitions.has(key)) {
           let blockName = e.definition.name;
           if (usedBlockNames.has(blockName.toLowerCase()))
@@ -68,7 +68,8 @@ export function toDXF(doc) {
           definitions.set(key, blockName);
           customBlocks.push({
             blockName,
-            flags: e.definition.entities.some((p) => p.attributeTag) ? 2 : 0,
+            flags: e._externalReference ? 4 | (e._externalReference.kind==='overlay'?8:0) : e.definition.entities.some((p) => p.attributeTag) ? 2 : 0,
+            path: e._externalReference?.path,
             entities: prepare(definition.entities),
           });
         }
@@ -78,7 +79,13 @@ export function toDXF(doc) {
       if (e.type === "text" || e.type === "leader") textStyleName(e);
       return [e];
     });
-  doc = { ...doc, entities: prepare(doc.entities) };
+  const references=(doc.references || []).map(r=>({
+    id:r.id,type:'block',layer:r.layer || doc.layers.find(l=>!l.referenceId)?.id || doc.layers[0].id,
+    point:r.point,scale:r.scale,rotation:r.rotation,mirrored:r.mirrored,space:r.space || 'model',
+    hidden:r.visible===false,values:{},_externalReference:r,
+    definition:{id:r.id,name:r.name.replace(/\.[^.]+$/,'').replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,64)||'Xref',entities:[]},
+  }));
+  doc = { ...doc, entities: prepare([...doc.entities,...references]) };
   prepare(
     (doc.blocks || []).map((definition) => ({ type: "block", definition })),
   );

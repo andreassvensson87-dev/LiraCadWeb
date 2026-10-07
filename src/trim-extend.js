@@ -6,7 +6,6 @@ const EPS = 1e-7,
   TAU = Math.PI * 2;
 const dot = (a, b) => a.x * b.x + a.y * b.y;
 const cross = (a, b) => a.x * b.y - a.y * b.x;
-const clamp = (x) => Math.max(0, Math.min(1, x));
 const shapes = (e) =>
   hasBulges(e)
     ? polylineParts(e).flatMap(shapes)
@@ -57,80 +56,94 @@ function intersections(a, b) {
   }
   return hits.filter((p) => b.type !== "arc" || onArc(b, angle(b.center, p)));
 }
+function pointAt(edge, t) {
+  return edge.type === "arc"
+    ? polar(edge.center, edge.radius, edge.startAngle + Math.sign(edge.sweep) * t / edge.radius)
+    : add(edge.a, mul(sub(edge.b, edge.a), t / edge.length));
+}
+function edgePosition(edge, p) {
+  if (edge.type !== "arc") return dot(sub(p, edge.a), sub(edge.b, edge.a)) / edge.length;
+  const t = mod(Math.sign(edge.sweep) * (angle(edge.center, p) - edge.startAngle)) * edge.radius;
+  // atan2 can put the start point just below zero after a round trip.
+  return edge.radius * TAU - t < EPS ? 0 : t;
+}
 function pathData(e) {
   let total = 0;
-  const edges = segments(e).map(([a, b]) => {
-    const start = total,
-      length = dist(a, b);
-    total += length;
-    return { a, b, start, length, type: "segment" };
-  });
+  const parts = e.type === "polyline" ? polylineParts(e) : [e];
+  const edges = parts.map((part) => {
+    const edge = part.type === "arc"
+      ? { ...part, startAngle: part.start, length: part.radius * Math.abs(part.sweep) }
+      : { type: "segment", a: part.points[0], b: part.points[1], length: dist(...part.points) };
+    edge.start = total;
+    total += edge.length;
+    return edge;
+  }).filter(edge => edge.length > EPS);
   return { edges, total };
 }
 function nearestPosition(edges, p) {
-  let best = Infinity,
-    result = 0;
-  for (const e of edges) {
-    const d = segmentDistance(p, e.a, e.b);
-    if (d < best) {
-      best = d;
-      result =
-        e.start +
-        clamp(dot(sub(p, e.a), sub(e.b, e.a)) / (e.length * e.length)) *
-          e.length;
-    }
+  let best = Infinity, result = 0;
+  for (const edge of edges) {
+    let t = edgePosition(edge, p);
+    if (edge.type === "arc" && t > edge.length)
+      t = dist(p, pointAt(edge, 0)) < dist(p, pointAt(edge, edge.length)) ? 0 : edge.length;
+    else t = Math.max(0, Math.min(edge.length, t));
+    const d = dist(p, pointAt(edge, t));
+    if (d < best) { best = d; result = edge.start + t; }
   }
   return result;
 }
 function subpath(edges, from, to) {
-  const points = [];
+  const parts = [];
   for (const edge of edges) {
-    const lo = Math.max(from, edge.start),
-      hi = Math.min(to, edge.start + edge.length);
+    const lo = Math.max(from, edge.start), hi = Math.min(to, edge.start + edge.length);
     if (hi - lo <= EPS) continue;
-    const a = add(
-      edge.a,
-      mul(sub(edge.b, edge.a), (lo - edge.start) / edge.length),
-    );
-    const b = add(
-      edge.a,
-      mul(sub(edge.b, edge.a), (hi - edge.start) / edge.length),
-    );
-    if (!points.length || dist(points.at(-1), a) > EPS) points.push(a);
-    points.push(b);
+    parts.push({ a: pointAt(edge, lo - edge.start), b: pointAt(edge, hi - edge.start),
+      bulge: edge.type === "arc" ? Math.tan(Math.sign(edge.sweep) * (hi - lo) / edge.radius / 4) : 0 });
   }
-  return points;
+  return parts;
+}
+function withPath(result, parts) {
+  const points = [parts[0].a, ...parts.map(part => part.b)];
+  const path = { ...result, points };
+  if (result.type === "polyline" && (result.bulges || parts.some(part => part.bulge)))
+    path.bulges = parts.map(part => part.bulge);
+  return path;
+}
+function extendArc(e, limits, first) {
+  const endpoint = first ? e.start : e.start + e.sweep,
+    sign = Math.sign(e.sweep) * (first ? -1 : 1);
+  const amounts = limits.flatMap(b => intersections({ ...e, type: "circle" }, b))
+    .map(q => mod(sign * (angle(e.center, q) - endpoint)))
+    .filter(t => t > EPS && t < TAU - Math.abs(e.sweep) - EPS).sort((a, b) => a - b);
+  if (!amounts.length) throw Error("Ingen gräns i förlängningens riktning.");
+  return { ...e, start: e.start - (first ? Math.sign(e.sweep) * amounts[0] : 0),
+    sweep: e.sweep + Math.sign(e.sweep) * amounts[0] };
 }
 export function trimExtend(e, boundaries, p, mode) {
-  if (e && hasBulges(e))
-    throw Error("Dela upp bågpolylinjen med X före TRIM/EXTEND.");
-  if (!e || !["line", "polyline", "arc"].includes(e.type))
-    throw Error("Välj en linje, båge eller rak polylinje.");
+  if (!e || !["line", "polyline", "arc", "circle"].includes(e.type))
+    throw Error("Välj en linje, cirkel, båge eller polylinje.");
   const limits = boundaries.filter((b) => b.id !== e.id).flatMap(shapes);
   if (!limits.length)
-    throw Error("Välj en annan gräns än objektet som ska ändras.");
+    throw Error("Ingen synlig gräns att trimma eller förlänga mot.");
   const result = clone(e);
   if (mode === "EXTEND") {
     if (e.type === "polyline" && e.closed)
       throw Error("En sluten polylinje kan inte förlängas.");
+    if (e.type === "circle") throw Error("En cirkel saknar ändar och kan inte förlängas. Trimma den till en båge först.");
     if (e.type === "arc") {
-      const endPoint = polar(e.center, e.radius, e.start + e.sweep);
-      const first =
-        dist(p, polar(e.center, e.radius, e.start)) < dist(p, endPoint);
-      const endpoint = first ? e.start : e.start + e.sweep,
-        sign = Math.sign(e.sweep) * (first ? -1 : 1);
-      const amounts = limits
-        .flatMap((b) => intersections({ ...e, type: "circle" }, b))
-        .map((q) => mod(sign * (angle(e.center, q) - endpoint)))
-        .filter((t) => t > EPS && t < TAU - Math.abs(e.sweep) - EPS)
-        .sort((a, b) => a - b);
-      if (!amounts.length)
-        throw Error("Ingen gräns i förlängningens riktning.");
-      if (first) result.start -= Math.sign(e.sweep) * amounts[0];
-      result.sweep += Math.sign(e.sweep) * amounts[0];
+      return [extendArc(e, limits, dist(p, polar(e.center, e.radius, e.start)) < dist(p, polar(e.center, e.radius, e.start + e.sweep)))];
     } else {
       const pts = result.points,
         first = dist(p, pts[0]) < dist(p, pts.at(-1));
+      const parts = e.type === "polyline" ? polylineParts(e) : [];
+      const terminal = first ? parts[0] : parts.at(-1);
+      if (terminal?.type === "arc") {
+        const arc = extendArc(terminal, limits, first);
+        pts[first ? 0 : pts.length - 1] = polar(arc.center, arc.radius, first ? arc.start : arc.start + arc.sweep);
+        result.bulges = parts.map((part, i) => i === (first ? 0 : parts.length - 1)
+          ? Math.tan(arc.sweep / 4) : (e.bulges?.[i] || 0));
+        return [result];
+      }
       const i = first ? 0 : pts.length - 1,
         j = first ? 1 : pts.length - 2;
       const v = sub(pts[i], pts[j]),
@@ -150,7 +163,11 @@ export function trimExtend(e, boundaries, p, mode) {
     total,
     position,
     edges;
-  if (e.type === "arc") {
+  if (e.type === "circle") {
+    total = TAU;
+    cuts = limits.flatMap(b => intersections(e, b)).map(q => mod(angle(e.center, q)));
+    position = mod(angle(e.center, p));
+  } else if (e.type === "arc") {
     total = Math.abs(e.sweep);
     const param = (q) =>
       mod(Math.sign(e.sweep) * (angle(e.center, q) - e.start));
@@ -170,37 +187,34 @@ export function trimExtend(e, boundaries, p, mode) {
     position = nearestPosition(edges, p);
     for (const edge of edges)
       for (const b of limits)
-        for (const q of intersections(edge, b)) {
-          const t =
-            dot(sub(q, edge.a), sub(edge.b, edge.a)) /
-            (edge.length * edge.length);
-          if (t >= -EPS && t <= 1 + EPS)
-            cuts.push(edge.start + clamp(t) * edge.length);
+        for (const q of intersections(edge.type === "arc" ? { ...edge, type: "circle" } : edge, b)) {
+          const t = edgePosition(edge, q);
+          if (t >= -EPS && t <= edge.length + EPS)
+            cuts.push(edge.start + Math.max(0, Math.min(edge.length, t)));
         }
     cuts = cuts.filter((t) => e.closed || (t > EPS && t < total - EPS));
   }
   cuts = cuts
     .sort((a, b) => a - b)
     .filter((v, i, a) => !i || v - a[i - 1] > EPS);
-  if (!cuts.length) throw Error("Ingen skärning med valda gränser.");
+  if (!cuts.length) throw Error("Ingen skärning med synliga gränser.");
   let ranges;
-  if (e.closed) {
+  if (e.closed || e.type === "circle") {
     cuts = cuts
       .map((t) => (Math.abs(t - total) < EPS ? 0 : t))
       .sort((a, b) => a - b)
       .filter((v, i, a) => !i || v - a[i - 1] > EPS);
     if (cuts.length < 2)
-      throw Error("En sluten polylinje behöver två skärningar.");
+      throw Error("En cirkel eller sluten polylinje behöver två skärningar.");
     const lo = cuts.findLast((t) => t <= position) ?? cuts.at(-1) - total;
     const hi = cuts.find((t) => t > position) ?? cuts[0] + total;
     const start = ((hi % total) + total) % total,
       end = ((lo % total) + total) % total;
-    const points =
-      start < end
-        ? subpath(edges, start, end)
-        : [...subpath(edges, start, total), ...subpath(edges, 0, end)];
-    const clean = points.filter((q, i) => !i || dist(q, points[i - 1]) > EPS);
-    return [{ ...result, points: clean, closed: false }];
+    if (e.type === "circle")
+      return [{ ...result, type: "arc", start, sweep: total - (hi - lo) }];
+    const parts = start < end ? subpath(edges, start, end)
+      : [...subpath(edges, start, total), ...subpath(edges, 0, end)];
+    return [withPath({ ...result, closed: false }, parts)];
   }
   const lo = cuts.findLast((t) => t <= position) ?? 0,
     hi = cuts.find((t) => t > position) ?? total;
@@ -216,6 +230,22 @@ export function trimExtend(e, boundaries, p, mode) {
           start: e.start + Math.sign(e.sweep) * a,
           sweep: Math.sign(e.sweep) * (b - a),
         }
-      : { ...result, id: i ? uid() : e.id, points: subpath(edges, a, b) },
+      : withPath({ ...result, id: i ? uid() : e.id }, subpath(edges, a, b)),
   );
+}
+
+// Exact crossings keep fast pointer moves from skipping narrow lines or arcs.
+export function trimSweepCrossings(entities, from, to) {
+  if (dist(from, to) < EPS) return [];
+  const stroke = { type: "segment", a: from, b: to }, length = dist(from, to);
+  const hits = [];
+  for (const entity of entities) {
+    for (const shape of shapes(entity)) {
+      for (const point of intersections(stroke, shape)) {
+        const t = dot(sub(point, from), sub(to, from)) / (length * length);
+        if (t >= -EPS && t <= 1 + EPS) hits.push({ entity, point, t });
+      }
+    }
+  }
+  return hits.sort((a, b) => a.t - b.t);
 }

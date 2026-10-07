@@ -8,6 +8,7 @@ export async function readDrawingFile(file, options = {}) {
   if (cad) options.onProgress?.(dwg ? "Öppnar DWG lokalt…" : "Läser DXF…");
   const imported = cad ? await readCAD(file, options) : null;
   const document = imported ? imported.document : JSON.parse(await file.text());
+  if(cad)document.sourcePath=file.webkitRelativePath || file.name;
   if (!validDocument(document)) throw Error("Ogiltig projektfil.");
   return { document, imported };
 }
@@ -16,6 +17,7 @@ async function readCAD(
   file,
   {
     onProgress = () => {},
+    onDiagnostic = () => {},
     createWorker = (url) => new Worker(url, { type: "module" }),
     timeout = 60000,
   } = {},
@@ -44,14 +46,20 @@ async function readCAD(
     );
     worker.onmessage = ({ data }) => {
       if (settled) return;
+      if (data.diagnostic) {
+        onDiagnostic(data.diagnostic);
+        return;
+      }
       if (data.progress) {
         onProgress(data.progress);
         return;
       }
       finish(data.error ? Error(data.error) : null, data.result);
     };
-    worker.onerror = () =>
+    worker.onerror = (event) => {
+      onDiagnostic({ level: "error", message: event?.message || `${format}-importen kunde inte startas.`, details: { filename: event?.filename, line: event?.lineno, column: event?.colno } });
       finish(Error(`${format}-importen kunde inte startas.`));
+    };
     worker.onmessageerror = () =>
       finish(Error(`${format}-importen gav ett oläsbart resultat.`));
     try {

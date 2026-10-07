@@ -43,7 +43,7 @@ På den här datorn finns också `Starta LiraCAD.command`, som använder Codex m
 | DI           | Mät avstånd                                                     |
 | U / REDO     | Ångra / gör om                                                  |
 
-Flytta, kopiera, rotera, skala och spegla fungerar för flerval. Spegla ersätter valda objekt. Skala använder positiv faktor; vid musinmatning motsvarar 1 000 mm från baspunkten faktor 1. Grips finns på linjer, polylinjer, hatch, leader, cirklar och text. Trim och Extend finns för linjer, bågar och raka polylinjer. Fillet och Chamfer stöder två raka linjer.
+Flytta, kopiera, rotera, skala och spegla fungerar för flerval. Spegla ersätter valda objekt. Skala använder positiv faktor; vid musinmatning motsvarar 1 000 mm från baspunkten faktor 1. Grips finns på linjer, polylinjer, hatch, leader, cirklar och text. Trim och Extend finns för linjer, bågar och polylinjer med raka eller böjda segment. Trimning av cirklar ger bågar. Fillet och Chamfer stöder två raka linjer.
 
 ## Filer
 
@@ -152,7 +152,7 @@ Kedjemått: markera en måttkedja eller ett äldre linjärt/riktat mått och sta
 
 ## Trimma och förläng
 
-TR / TRIM och EX / EXTEND finns under Redigera. Välj gränser och tryck Enter (utan val används alla lämpliga objekt i aktuellt utrymme). Klicka delen som ska bort för TRIM, eller nära änden som ska förlängas för EXTEND. Förhandsvisning visar resultatet; fortsätt klicka och avsluta med Enter/Escape. Varje klick kan ångras. Linjer, bågar och raka polylinjer stöds som mål; cirklar fungerar också som gränser. Slutna polylinjer öppnas vid trimning och kan inte förlängas. Gränser måste verkligen skära målet eller dess förlängning; ingen imaginär förlängning av gränserna används.
+**Trimma / Förläng** finns under Ändra och startar direkt med TR / TRIM. Klicka delen som ska bort; håll Shift och klicka nära en ände för att förlänga till närmaste skärning i dess riktning. Alla synliga lämpliga objekt i aktuellt utrymme används automatiskt som gränser, även låsta objekt, blockdelar och referenser. Gränserna behöver inte väljas eller bekräftas. EX / EXTEND finns kvar som genväg med förlängning som grundfunktion och trimning med Shift. Förhandsvisning och kommandoprompt följer Shift direkt. Klicka eller håll ner vänster musknapp och dra över flera objekt. Svepet förhandsvisas och sparas när musknappen släpps; varje objekt ändras högst en gång per svep. Shift växlar funktion även medan du drar. Hela svepet kan ångras i ett steg. Esc avbryter utan ändringar. Fortsätt klicka eller svepa och avsluta med Enter/Escape. Linjer, bågar och polylinjer med raka eller böjda segment stöds som mål. Cirklar trimmas till bågar; klickad del mellan två skärningar tas bort. Cirklar och slutna polylinjer saknar fria ändar och kan inte förlängas. Slutna polylinjer öppnas vid trimning. Bågsegment behåller sin cirkulära geometri och riktning. Gränser måste verkligen skära målet eller dess förlängning; ingen imaginär förlängning av gränserna används.
 
 
 ## Git, säkerhetskopiering och automatisk publicering
@@ -224,7 +224,7 @@ Windows Utforskarens riktiga standardappsval måste verifieras på Windows.
 - Markerade block har dessutom ett flyttgrepp vid geometrins mitt, så även importerade block med en avlägsen insättningspunkt kan flyttas med grepp i vyn. Greppet flyttar hela instansen; definition och stretchvärden behålls.
 - **ATTDEF / ATT:** markera en enkelradig text och ange ett attributnamn (A–Z, 0–9, _). Ta med texten när blocket skapas. Varje infogat block har egna värden som ändras i inspektorn. Nya instanser får definitionens standardvärden. BEDIT finns; se blockeditorn nedan. Nästlade block, AutoCADs dynamiska blockfunktioner och multiline-attribut ingår inte i denna första version.
 - **PL / PLINE:** välj startpunkt och fortsätt med raka segment. **A** växlar till båge via en mellanpunkt och en slutpunkt. **L** återgår till linje, **U** ångrar senaste segment/mellanpunkt, **C** sluter med en rak kant och Enter avslutar. Bågens mittgrepp ändrar krökningen. JOIN kan sammanfoga linjer, bågar och öppna polylinjer; EXPLODE ger tillbaka linjer och bågar. Bågsegment lagras som DXF-bulge, inte som korta raka linjer.
-- OFFSET, TRIM/EXTEND och lägg till/ta bort hörn stöder ännu inte bågpolylinjer som redigeringsmål; kommandot säger till. Dela upp med X först. Bågpolylinjer fungerar som trimgränser.
+- TRIM/EXTEND stöder bågpolylinjer både som redigeringsmål och gränser. OFFSET och lägg till/ta bort hörn kräver fortfarande uppdelning med X först.
 - DXF-export skriver BLOCK/INSERT, ATTDEF/ATTRIB, LWPOLYLINE med bulge och riktiga DIMENSION-objekt med DIMSTYLE och anonyma visningsblock. Måttkedjor blir separata redigerbara delmått i DXF. Måtten är ännu inte associativt kopplade till den måttsatta geometrin. Export har kontrollerats med ezdxf; öppning/regenerering i AutoCAD behöver också provas med riktiga filer.
 
 DXF-referenser: [INSERT](https://help.autodesk.com/cloudhelp/2021/ENU/AutoCAD-DXF/files/GUID-28FA4CFB-9D5E-4880-9F11-36C97578252F.htm), [LWPOLYLINE](https://help.autodesk.com/cloudhelp/2015/ENU/AutoCAD-DXF/files/GUID-748FC305-F3F2-4F74-825A-61F04D757A50.htm), [DIMENSION](https://help.autodesk.com/cloudhelp/2023/ENU/AutoCAD-DXF/files/GUID-239A1BDD-7459-4BB9-8DD7-08EC79BF1EB0.htm).

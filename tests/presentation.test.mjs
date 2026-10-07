@@ -102,8 +102,8 @@ test("command prompts reflect tool phases and current defaults", () => {
     /hela måttlinjen/,
   );
   assert.match(
-    commandPrompt({ name: "TRIM", points: [], phase: "select" }),
-    /gränser/,
+    commandPrompt({ name: "TRIM", points: [], phase: "trimPick" }),
+    /Trimma:.*Shift.*förläng/,
   );
   assert.match(
     commandPrompt(

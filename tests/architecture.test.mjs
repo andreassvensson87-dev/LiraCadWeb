@@ -25,7 +25,8 @@ const root = new URL("../src/", import.meta.url);
 test('every catalog command has a toolbar home and block workflows stay together', () => {
   const commands=Object.values(toolbarGroups).flatMap(groups=>groups.flatMap(group=>group.commands));
   assert.equal(new Set(commands).size,commands.length);
-  assert.deepEqual([...commands].sort(),definitions.map(([name])=>name).filter(name=>name!=='MVIEW').sort());
+  assert.deepEqual([...commands].sort(),definitions.map(([name])=>name).filter(name=>!['MVIEW','EXTEND'].includes(name)).sort());
+  assert.ok(commands.includes('TRIM'));assert.ok(!commands.includes('EXTEND'));
   const blocks=toolbarGroups.block.flatMap(group=>group.commands);
   for(const name of ['BLOCK','INSERT','BEDIT','BSTRETCH','ATTDEF','WBLOCK'])assert.ok(blocks.includes(name),name);
 });

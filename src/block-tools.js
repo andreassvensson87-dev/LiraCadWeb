@@ -2,9 +2,13 @@ import { createBlock, insertBlock, validBlockName, validTag } from "./blocks.js"
 import { parsePoint } from "./geometry.js";
 import { clone } from "./values.js";
 import { commandPrompt } from "./command-prompts.js";
+import { catalogInstance } from "./catalog-placement.js";
 
 const templates = (context) => context.templates || [];
 const named = (context, name) => templates(context).find((e) => e.definition.name.toLowerCase() === name.toLowerCase());
+const acceptedTemplate = (state, context) => templates(context).find(e => e.definition.id === state.template.definition.id)
+  || (state.catalog?.standard ? { ...state.template, definition: { ...state.template.definition,
+    entities: state.template.definition.entities.map(e => ({ ...e, layer: context.creation.layer })) } } : null);
 function point(state, p, context) {
   if (state.phase !== "points") return { state };
   const { layer, space, color, lineType } = context.creation;
@@ -18,13 +22,24 @@ function point(state, p, context) {
     } };
   }
   // Resolve the accepted definition again: the preview snapshot cannot overwrite a newer definition.
-  const template = templates(context).find((e) => e.definition.id === state.template.definition.id);
+  if (state.catalog && context.catalogPlacementReason) throw Error(context.catalogPlacementReason);
+  const template = acceptedTemplate(state, context);
   if (!template) throw Error("Blocket finns inte längre.");
-  const block = { ...insertBlock(template, p, layer, space), color, lineType };
-  return { state: null, selection: [block.id], change: { kind: "editing", label: "Infoga block", entities: [block] } };
+  const block = state.catalog ? catalogInstance(template, p, context.creation, state.catalog)
+    : { ...insertBlock(template, p, layer, space), color, lineType };
+  const definitions = state.catalog?.standard && !templates(context).some(e => e.definition.id === template.definition.id)
+    ? [template.definition] : undefined;
+  if (definitions && named(context, template.definition.name)) throw Error("Blocknamnet används redan. Byt namn på det befintliga blocket först.");
+  return { state: null, selection: [block.id], change: { kind: "editing", label: state.catalog ? "Placera katalogdetalj" : "Infoga block", entities: [block], ...(definitions ? { definitions } : {}) } };
 }
 function handle(state, event, context) {
   try {
+    if (event.type === "catalog" && state.name === "INSERT") {
+      if (context.catalogPlacementReason) throw Error(context.catalogPlacementReason);
+      if (!event.template?.definition?.entities?.length || !Number.isFinite(event.rotation)) throw Error("Ogiltig katalogdetalj.");
+      return { state: { ...state, phase: "points", template: clone(event.template),
+        catalog: { standard: !!event.standard, rotation: event.rotation, anchor: event.anchor, label: event.label } }, selection: [] };
+    }
     if (event.type === "point") return point(state, event.point, context);
     if (event.type !== "text") return { state };
     const text = event.text.trim(), sources = context.entities || [];
@@ -60,9 +75,11 @@ export const blockTools = Object.fromEntries(["BLOCK", "INSERT", "ATTDEF"].map((
   handle,
   preview(state, cursor, context) {
     if (state.name !== "INSERT" || state.phase !== "points") return [];
-    const template = templates(context).find((e) => e.definition.id === state.template.definition.id);
+    if (state.catalog && context.catalogPlacementReason) return [];
+    const template = acceptedTemplate(state, context);
     const { layer, space, color, lineType } = context.creation;
-    return template ? [{ ...insertBlock(template, cursor, layer, space), color, lineType }] : [];
+    return template ? [state.catalog ? catalogInstance(template, cursor, context.creation, state.catalog)
+      : { ...insertBlock(template, cursor, layer, space), color, lineType }] : [];
   },
   describe: (state) => ({ prompt: commandPrompt(state), properties: ["layer", "color", "lineType"] }),
 }]));

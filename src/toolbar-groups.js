@@ -6,7 +6,7 @@ export const toolbarGroups = {
   ],
   edit: [
     {label:'Placering',commands:['MOVE','COPY','ROTATE','SCALE','MIRROR']},
-    {label:'Forma',commands:['STRETCH','OFFSET','TRIM','EXTEND','FILLET','CHAMFER']},
+    {label:'Forma',commands:['STRETCH','OFFSET','TRIM','FILLET','CHAMFER']},
     {label:'Objekt & hörn',commands:['JOIN','PINSERT','PDELETE','ERASE']},
   ],
   block: [

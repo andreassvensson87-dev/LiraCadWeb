@@ -62,7 +62,7 @@ export function dxfLayouts(doc, pair, custom = []) {
       pair(20, 0);
       pair(30, 0);
       pair(3, l.blockName);
-      pair(1, "");
+      pair(1, l.path || "");
       content(l);
       pair(0, "ENDBLK");
       pair(5, handle());

@@ -2,6 +2,7 @@ import { dist, number, parsePoint } from "./geometry.js";
 import { offset } from "./offset.js";
 import { hasBulges } from "./polyline.js";
 import { trimExtend } from "./trim-extend.js";
+import { beginTrimSweep, moveTrimSweep, trimSweepPreview, trimSweepChange } from "./trim-sweep.js";
 import { commandPrompt } from "./command-prompts.js";
 
 const supported = (e) => ["line", "polyline", "circle", "arc"].includes(e.type);
@@ -48,31 +49,32 @@ function offsetHandle(state, event, context) {
   return { state: null, selection: [], change: { kind: "editing", label: "Offset", entities: copies } };
 }
 function trimResult(state, context) {
+  const source=context.hitEntity;
+  if(!source || !(context.editableEntities || []).some(e=>e.id===source.id))throw Error('Välj en redigerbar linje, cirkel, båge eller polylinje.');
   return trimExtend(context.hitEntity,
-    (context.editableEntities || []).filter((e) => state.boundaryIds.includes(e.id)),
-    context.pointer, state.name);
+    (context.boundaryEntities || context.editableEntities || []).filter(supported),
+    context.pointer, trimMode(state,context));
 }
+const trimMode=(state,context={})=>(Boolean(context.shift ?? state.shift) !== (state.name==='EXTEND'))?'EXTEND':'TRIM';
 function trimHandle(state, event, context) {
-  if (state.phase === "select") {
-    if (event.type !== "text") return { state };
-    if (event.text.trim()) return { state, message: "Markera objekt och tryck Enter." };
-    const selected = context.entities || [];
-    const boundaries = (selected.length ? selected : context.editableEntities || []).filter(supported);
-    if (!boundaries.length) return { state, message: "Välj linjer, polylinjer, bågar eller cirklar som gränser." };
-    const boundaryIds = boundaries.map((e) => e.id);
-    return { state: { ...state, boundaryIds, phase: "trimPick" }, selection: boundaryIds };
+  if(event.type==='modifier')return {state:{...state,shift:!!event.shift}};
+  if (event.type === "sweepStart") return { state: { ...state, sweep: beginTrimSweep(context, trimMode(state, context)) } };
+  if (event.type === "sweepCancel") { const { sweep, ...rest } = state; return { state: rest }; }
+  if (["sweepMove", "sweepEnd"].includes(event.type) && state.sweep) {
+    const sweep = moveTrimSweep(state.sweep, context.pointer, trimMode(state, context));
+    if (event.type === "sweepMove") return { state: { ...state, sweep } };
+    const { sweep: old, ...rest } = state;
+    const change = trimSweepChange(sweep);
+    return { state: rest, selection: [], ...(change ? { change } : { message: sweep.error || "Svepet träffade inget objekt som kunde ändras." }) };
   }
   if (event.type === "text") return event.text.trim()
     ? { state, message: "Klicka på objektet i ritytan · Enter avslutar." }
     : { state: null, selection: [] };
   try {
     const replacements = trimResult(state, context), id = context.hitEntity.id;
-    const boundaryIds = state.boundaryIds.includes(id)
-      ? state.boundaryIds.filter((x) => x !== id).concat(replacements.map((e) => e.id))
-      : state.boundaryIds;
     return {
-      state: { ...state, boundaryIds }, selection: boundaryIds,
-      change: { kind: "editing", label: state.name === "TRIM" ? "Trimma" : "Förläng", replaceId: id, entities: replacements },
+      state, selection: [],
+      change: { kind: "editing", label: trimMode(state,context) === "TRIM" ? "Trimma" : "Förläng", replaceId: id, entities: replacements },
     };
   } catch (error) { return { state, message: error.message }; }
 }
@@ -94,10 +96,11 @@ export const editingTools = {
     describe: (state) => ({ prompt: commandPrompt(state), properties: ["layer", "color", "lineType"] }),
   },
   ...Object.fromEntries(["TRIM", "EXTEND"].map((name) => [name, {
-    create: () => ({ name, phase: "select", points: [], boundaryIds: [] }),
+    create: context => ({ name, phase: "trimPick", points: [], shift:!!context.shift }),
     handle: trimHandle,
     preview(state, cursor, context) {
       if (state.phase !== "trimPick") return [];
+      if (state.sweep) return trimSweepPreview(state.sweep);
       try { return trimResult(state, context); } catch { return []; }
     },
     describe: (state) => ({ prompt: commandPrompt(state), properties: ["layer", "color", "lineType"] }),

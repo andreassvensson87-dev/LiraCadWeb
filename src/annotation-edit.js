@@ -18,7 +18,7 @@ export function annotationView(e,viewport,layers=[]){
   if(!parts.length)return null;
   if(parts.some((p,i)=>p!==view.definition.entities[i])||parts.length!==view.definition.entities.length)view={...view,definition:{...view.definition,entities:parts}};
  }
- for(const key of ['hidden','color','lineType','lineWeight','cadColor7','inheritLayer']){if(key in e)view={...view,[key]:e[key]};else if(key in view){view={...view};delete view[key];}}
+ for(const key of ['hidden','color','lineType','lineWeight','cadColor7','inheritLayer','_xrefId','_xrefSnap','_xrefOpacity']){if(key in e)view={...view,[key]:e[key]};else if(key in view){view={...view};delete view[key];}}
  if(!hasAnnotationView(e))return view;
  // Content belongs to the object; placement and appearance belong to the scale.
  if(e.type==='text'||e.type==='dimension'){const changed=view.text!==e.text;view={...view,text:e.text};if(changed)delete view.textRuns;}
