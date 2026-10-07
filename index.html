@@ -108,6 +108,18 @@
           <button id="new-project-tab" aria-label="Nytt projekt" title="Nytt projekt">+</button>
           <select id="reopen-project" aria-label="Återöppna stängt projekt" hidden></select>
         </div>
+        <section id="empty-workspace" hidden aria-labelledby="empty-workspace-title">
+          <div class="empty-workspace-card">
+            <img src="./lira-icon.svg" alt="" width="64" height="64" />
+            <h1 id="empty-workspace-title">Ingen ritning öppen</h1>
+            <p>Skapa en ny ritning eller öppna en befintlig fil.</p>
+            <div class="empty-workspace-actions">
+              <button class="primary" id="empty-new">Skapa ny ritning</button>
+              <button id="empty-open">Öppna ritning…</button>
+            </div>
+            <p class="empty-workspace-note">Stängda projekt finns under Återöppna projekt ovan.</p>
+          </div>
+        </section>
         <canvas
           role="tabpanel"
           id="canvas"

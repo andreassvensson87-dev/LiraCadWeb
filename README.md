@@ -14,6 +14,7 @@ På den här datorn finns också `Starta LiraCAD.command`, som använder Codex m
 
 ## Prova
 
+- Sista projektfliken kan stängas. Då visas ett startläge med **Skapa ny ritning** och **Öppna ritning**. Stängda projekt autosparas först och kan återöppnas från listan ovanför ritytan. Startläget bevaras när appen laddas om; om autosparning misslyckas hålls fliken öppen.
 - Öppna **Inställningar** i toppraden för att generera en exempelritning eller ett stresstest med 1 000, 10 000 eller 100 000 objekt. Välj blandade objekt eller enbart linjer. Genereringen ersätter ritningen och kan återställas med `U`/Ångra under samma session. Där finns också valet av navigeringsenhet.
 - För reproducerbara utvecklarprov, öppna `/tests/performance/` på den lokala servern. Se [mätresultat och kvarvarande begränsningar](docs/performance.md).
 - Exempelritningen innehåller alla objekttyper. Klicka på ett objekt för att markera det. Dra en markeringsruta eller klicka på en tom plats och sedan på rutans motsatta hörn. Vänster till höger väljer helt inneslutna objekt; höger till vänster väljer också korsade objekt. Esc avbryter rutan. Shift lägger till/tar bort ur markeringen.

@@ -1,4 +1,24 @@
 /* Shared visual dimensions for the Lira family. */
+body[data-lira-app="cad"].workspace-empty main { grid-template-columns: minmax(0, 1fr) !important; }
+body[data-lira-app="cad"].workspace-empty .workspace { grid-template-rows: 37px minmax(0, 1fr); }
+body.workspace-empty #canvas,
+body.workspace-empty .tabs,
+body.workspace-empty .ribbon,
+body.workspace-empty main > aside,
+body.workspace-empty .drawing-tabs,
+body.workspace-empty .command-panel,
+body.workspace-empty > footer { display: none !important; }
+#empty-workspace:not([hidden]) {
+  display: grid; place-items: center; min-height: 0; padding: 30px;
+  overflow: auto; background: #f3f7f5; color: #254139;
+}
+.empty-workspace-card { max-width: 520px; text-align: center; }
+.empty-workspace-card h1 { font-size: 26px; margin: 18px 0 12px; font-weight: 600; }
+.empty-workspace-card p { font-size: 14px; line-height: 1.6; color: #63786e; }
+.empty-workspace-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 28px 0; }
+.empty-workspace-actions button { padding: 12px 20px; border: 1px solid #bfd1c7; border-radius: 7px; background: #fff; font-size: 14px; }
+.empty-workspace-actions button.primary { background: #16785a; color: #fff; border-color: #16785a; }
+.empty-workspace-card .empty-workspace-note { font-size: 12px; }
 body[data-lira-app] > header {
   height: 54px;
   min-height: 54px;

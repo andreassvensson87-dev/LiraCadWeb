@@ -15,6 +15,10 @@ function command(text) {
   input.dispatchEvent(new frame.contentWindow.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
 }
 function click(selector){query(selector).click();}
+async function reloadApp() {
+  const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
+  frame.contentWindow.location.reload();await loaded;
+}
 document.querySelector('#run').onclick=async()=>{
   const button=document.querySelector('#run');button.disabled=true;const passed=[];
   result.textContent='Kör…';
@@ -61,7 +65,7 @@ document.querySelector('#run').onclick=async()=>{
     const reopen=query('#reopen-project');reopen.value=file;reopen.dispatchEvent(new frame.contentWindow.Event('change',{bubbles:true}));
     await wait(()=>tabs().length===4 && count()===2 && !app().body.inert);
     passed.push('Stängd flik kan återöppnas utan förlorad geometri');
-    frame.contentWindow.location.reload();
+    await reloadApp();
     await wait(()=>query('#project-tabs [role="tab"]') && tabs().length===4 && !app().body.inert);
     assert(query('#project-tabs [aria-selected="true"]').dataset.project===file,'Aktiv flik ska återställas.');
     assert(count()===2,'Öppnad fil ska återställas efter omladdning.');
@@ -69,7 +73,31 @@ document.querySelector('#run').onclick=async()=>{
     query('[data-project="'+first+'"]').click();assert(count()===baseline,'Startprojektet ska vara bevarat efter omladdning.');
     query('[data-project="'+file+'"]').click();
     passed.push('Alla projekt och aktiv flik återställs efter omladdning');
-    result.textContent='GODKÄNT\n'+passed.map(text=>'✓ '+text).join('\n')+'\n4 projektflikar · startprojektet bevarat';
+    while(tabs().length) {
+      click('#project-tabs .close-project');
+      await wait(()=>!app().body.inert);
+    }
+    assert(!query('#empty-workspace').hidden,'Sista fliken ska visa startläget.');
+    assert(query('#command-input').disabled && query('#save-file').disabled,'Ritkommandon och spara ska vara avstängda utan projekt.');
+    await reloadApp();
+    await wait(()=>query('#empty-workspace') && !query('#empty-workspace').hidden && !app().body.inert);
+    assert(tabs().length===0,'Omladdning ska behålla startläget.');
+    const closed=query('#reopen-project');closed.value=file;closed.dispatchEvent(new frame.contentWindow.Event('change',{bubbles:true}));
+    await wait(()=>tabs().length===1 && !app().body.inert);
+    assert(count()===2,'Sista stängda projektets geometri ska kunna återöppnas.');
+    click('#project-tabs .close-project');await wait(()=>tabs().length===0 && !app().body.inert);
+    click('#empty-new');await wait(()=>tabs().length===1 && !query('#save-file').disabled);
+    assert(query('#empty-workspace').hidden && count()===0,'Skapa ny ska lämna startläget med en tom ritning.');
+    click('#project-tabs .close-project');await wait(()=>tabs().length===0 && !app().body.inert);
+    const reopenedFile=new frame.contentWindow.DataTransfer();
+    reopenedFile.items.add(new frame.contentWindow.File([JSON.stringify(document)],'Öppnad projektfil.liracad',{type:'application/json'}));
+    query('#file-input').files=reopenedFile.files;query('#file-input').dispatchEvent(new frame.contentWindow.Event('change',{bubbles:true}));
+    await wait(()=>tabs().length===1 && count()===2 && !app().body.inert);
+    assert(query('#empty-workspace').hidden,'Filöppning ska lämna startläget.');
+    await wait(()=>parseInt(query('#zoom-level').textContent)>0);
+    assert(query('#canvas').getBoundingClientRect().width>0,'Ritytan ska vara synlig efter filöppning.');
+    passed.push('Sista fliken stängs till startläge; omladdning, återöppna, skapa ny och filöppning fungerar');
+    result.textContent='GODKÄNT\n'+passed.map(text=>'✓ '+text).join('\n');
   } catch(error){result.textContent='FEL: '+error.message+'\n'+passed.join('\n');}
   finally{button.disabled=false;}
 };

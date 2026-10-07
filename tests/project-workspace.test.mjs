@@ -65,11 +65,41 @@ test('closing saves latest document, releases session and lets the saved project
   assert.equal(await workspace.close(second.id),true);
   assert.equal(workspace.activeId,first.id);assert.equal(workspace.entries.length,1);
   assert.equal(h.records.get(second.id).document.entities.length,0);
-  assert.equal(await workspace.close(first.id),false);
+  assert.equal(await workspace.close(first.id),true);
+  assert.equal(workspace.active,undefined);assert.equal(workspace.activeId,null);
   const restored=h.create();await restored.restore();
+  assert.equal(restored.entries.length,0);assert.equal(restored.active,undefined);
   const reopened=await restored.reopen(second.id);
-  assert.equal(restored.activeId,second.id);assert.equal(restored.closed.length,0);
+  assert.equal(restored.activeId,second.id);assert.equal(restored.closed.length,1);
   assert.equal(reopened.session.document.entities.length,0);
+});
+test('last project close preserves latest work and the empty workspace survives reload and new creation',async()=>{
+  const h=harness(),workspace=h.create();await workspace.restore();
+  const first=workspace.active;
+  first.session.commit('Namn',doc=>{doc.name='Senaste arbetet';});
+  first.context={camera:{x:20,y:30,scale:2}};
+  await workspace.close(first.id);
+  assert.equal(h.records.get(first.id).document.name,'Senaste arbetet');
+  assert.deepEqual(JSON.parse(h.values.get('liracad-workspace-v1')).open,[]);
+  const restored=h.create();assert.equal(await restored.restore(),undefined);
+  const reopened=await restored.reopen(first.id);
+  assert.equal(reopened.session.document.name,'Senaste arbetet');
+  assert.deepEqual(reopened.context.camera,first.context.camera);
+  await restored.close(first.id);
+  const fresh=restored.add({...demoDocument(),name:'Ny ritning'});await fresh.ready;
+  const reloaded=h.create();await reloaded.restore();
+  assert.equal(reloaded.active.session.document.name,'Ny ritning');
+  assert.equal(reloaded.closed[0].name,'Senaste arbetet');
+});
+test('failure to save the final project or its manifest keeps it open',async()=>{
+  const h=harness(),workspace=h.create();await workspace.restore();const first=workspace.active;
+  const write=first.storage.store.write;
+  first.storage.store.write=async()=>{throw Error('Disk full');};
+  await assert.rejects(workspace.close(first.id),/Disk full/);assert.equal(workspace.active,first);
+  first.storage.store.write=write;
+  h.metadata.setItem=()=>{throw Error('Quota');};
+  await assert.rejects(workspace.close(first.id),/Quota/);
+  assert.equal(workspace.active,first);assert.equal(workspace.entries.length,1);assert.equal(workspace.closed.length,0);
 });
 test('failed close leaves tab and session intact, including when manifest cannot be saved',async()=>{
   const h=harness(),workspace=h.create();await workspace.restore();

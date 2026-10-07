@@ -125,12 +125,13 @@ document.body.inert = true;
 $('#save-state').textContent = 'Läser projekt…';
 // Load before measuring restored text or building its spatial index.
 const [initialProject] = await Promise.all([projectWorkspace.restore(), loadCadFonts()]);
-let projectStorage = initialProject.storage;
-const restored = initialProject.restored;
-let documentSession = initialProject.session;
+const emptyDocument = () => ({version:1,name:'',layers:[{id:'0',name:'0',color:'#c3d6ce'}],entities:[]});
+let projectStorage = initialProject?.storage || null;
+const restored = initialProject?.restored || {};
+let documentSession = initialProject?.session || new DocumentSession(emptyDocument());
 let doc = documentSession.document;
-$('#save-state').textContent = initialProject.saveState;
-$('#save-state').title = initialProject.saveError?.message || '';
+$('#save-state').textContent = initialProject?.saveState || '';
+$('#save-state').title = initialProject?.saveError?.message || '';
 document.body.inert = false;
 const restoreError = restored.error;
 let activeLayer = doc.layers[0].id,
@@ -498,6 +499,7 @@ function rebuild() {
   indexedSpace = space;
 }
 function persisted() {
+  if (!projectWorkspace.active) return;
   if (blockEditor) {
     $("#save-state").textContent = "Blockändringar ej sparade";
     return;
@@ -534,6 +536,8 @@ function showProjectSaveState(entry) {
   $('#save-state').title = (entry.saveError || projectWorkspace.manifestError)?.message || '';
 }
 function update() {
+  renderWorkspaceState();
+  if (!projectWorkspace.active) { renderProjectTabs(); schedule(); return; }
   if (
     activeSpace !== "model" &&
     !doc.layouts?.some((l) => l.id === activeSpace)
@@ -802,6 +806,7 @@ function cancel(clear = true) {
   update();
 }
 function start(name) {
+  if (!projectWorkspace.active) return;
   drag=null;
   if (textEditor.active && !finishTextEdit(true)) return;
   name = aliases[name.toUpperCase()] || name.toUpperCase();
@@ -980,6 +985,7 @@ function acceptPoint(p) {
   prompt();
 }
 function submit(value) {
+  if (!projectWorkspace.active) return;
   const text = value.trim();
   if (wblockDialog.picking) {
     input.value='';
@@ -1457,6 +1463,7 @@ input.addEventListener("keydown", (ev) => {
     ev.preventDefault();
 });
 document.addEventListener("keydown", (ev) => {
+  if (!projectWorkspace.active) return;
   const editing = ev.target.matches(
     "input,select,textarea,[contenteditable=true]",
   );
@@ -1764,12 +1771,24 @@ window.addEventListener("beforeunload", (event) => {
 function captureProjectContext() {
   if (blockEditor) return;
   const entry = projectWorkspace.active;
+  if (!entry) return;
   entry.context = {activeLayer,selection:[...selection],camera:{...camera},activeSpace,
     activeViewportId,paperCamera:paperCamera && {...paperCamera},
     spaceCameras:[...spaceCameras],dirty};
   projectWorkspace.persist();
 }
 function activateProject(entry) {
+  if (!entry) {
+    editor.cancel(); wblockDialog.dismiss(); tool=null; drag=null; hover=null; snap=null;
+    selection.clear(); clearTracking(); space=false; spaceUsed=false; dirty=false;
+    documentSession=new DocumentSession(emptyDocument()); doc=documentSession.document;
+    history=documentSession.history; projectStorage=null;
+    activeLayer=doc.layers[0].id; activeSpace='model'; activeViewportId=null; paperCamera=null;
+    spaceCameras.clear(); sceneIndex=null; snapCache=null; indexedDocument=null; indexedSpace=null;
+    rebuild(); commandCompletion.hide(); input.value='';
+    clearTimeout(navigationTimer); navigationDeadline=0;
+    update(); return;
+  }
   projectWorkspace.activeId = entry.id;
   documentSession = entry.session;
   doc = documentSession.document;
@@ -1793,7 +1812,7 @@ function activateProject(entry) {
   clearTimeout(navigationTimer); navigationDeadline = 0;
   // Retain a single set of render/snap indexes, even with many open projects.
   sceneIndex = null; snapCache = null; indexedDocument = null; indexedSpace = null;
-  update(); prompt();
+  update(); resize(); prompt();
   if (!entry.context) fit();
   projectWorkspace.persist();
   showProjectSaveState(entry);
@@ -1801,6 +1820,7 @@ function activateProject(entry) {
 function prepareProjectSwitch() {
   if (documentWorkflow.opening) { log('Vänta tills filen har öppnats.'); return false; }
   if (blockEditor) { log('Spara eller avbryt blockredigeringen innan du byter projekt.'); return false; }
+  if (!projectWorkspace.active) return true;
   if (textEditor.active && !finishTextEdit(true)) return false;
   syncViewport();
   cancel(false);
@@ -1812,6 +1832,23 @@ function switchProject(id) {
   if (id === projectWorkspace.activeId || !prepareProjectSwitch()) return;
   const entry = projectWorkspace.entries.find(entry => entry.id === id);
   if (entry) { activateProject(entry); canvas.focus(); }
+}
+function renderWorkspaceState() {
+  const empty = !projectWorkspace.active;
+  document.body.classList.toggle('workspace-empty', empty);
+  $('#empty-workspace').hidden = !empty;
+  for (const element of $$('#canvas, .tabs, .ribbon, main > aside, .drawing-tabs, .command-panel, body > footer')) element.inert = empty;
+  $('#save-file').disabled = empty;
+  $('#export-dxf').disabled = empty || !!blockEditor;
+  input.disabled = empty;
+  if (empty) {
+    $('#undo').disabled=true; $('#redo').disabled=true;
+    $('#document-name').textContent='Ingen ritning öppen';
+    $('#save-state').textContent=''; $('#save-state').title='';
+  }
+}
+function focusWorkspace() {
+  (projectWorkspace.active ? canvas : $('#empty-new')).focus();
 }
 function renderProjectTabs() {
   const tabs = $('#project-tabs');
@@ -1832,17 +1869,17 @@ function renderProjectTabs() {
     const close = document.createElement('button'); close.type = 'button'; close.className = 'close-project';
     close.textContent = '×'; close.title = 'Stäng projektflik';
     close.setAttribute('aria-label','Stäng '+entry.session.document.name);
-    close.disabled = projectWorkspace.entries.length === 1;
     close.onclick = async () => {
       if (!prepareProjectSwitch()) return;
       document.body.inert = true;
       try { if (await projectWorkspace.close(entry.id)) activateProject(projectWorkspace.active); }
       catch(error) { log('Kunde inte stänga projektfliken: '+error.message); }
-      finally { document.body.inert = false; canvas.focus(); }
+      finally { document.body.inert = false; focusWorkspace(); }
     };
     group.append(button,close); return group;
   }));
-  canvas.setAttribute('aria-labelledby','tab-'+projectWorkspace.activeId);
+  if (projectWorkspace.active) canvas.setAttribute('aria-labelledby','tab-'+projectWorkspace.activeId);
+  else canvas.removeAttribute('aria-labelledby');
   const reopen = $('#reopen-project');
   reopen.hidden = !projectWorkspace.closed.length;
   reopen.replaceChildren(new Option('Återöppna projekt…',''), ...projectWorkspace.closed.map(entry => new Option(entry.name,entry.id)));
@@ -1850,13 +1887,15 @@ function renderProjectTabs() {
   if (focused) tabs.querySelector(`[data-project="${focused}"]`)?.focus();
 }
 $('#new-project-tab').onclick = () => $('#new-file').click();
+$('#empty-new').onclick = () => { $('#new-file').click(); focusWorkspace(); };
+$('#empty-open').onclick = () => $('#open-file').click();
 $('#reopen-project').onchange = async event => {
   const id = event.target.value; event.target.value = '';
   if (!id || !prepareProjectSwitch()) return;
   document.body.inert = true;
   try { const entry = await projectWorkspace.reopen(id); if(entry)activateProject(entry); }
   catch(error) { log('Kunde inte återöppna projektet: '+error.message); }
-  finally { document.body.inert = false; canvas.focus(); }
+  finally { document.body.inert = false; focusWorkspace(); }
 };
 $('#project-tabs').onkeydown = event => {
   if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key) || !event.target.dataset.project) return;
@@ -1899,6 +1938,7 @@ createSettingsPanel({
   replaceDocument: documentWorkflow.replace, log,
 });
 function saveProject() {
+  if (!projectWorkspace.active) return;
   try {
     if (!documentWorkflow.save()) return;
     dirty = false;
@@ -1906,6 +1946,7 @@ function saveProject() {
   } catch (error) { log(`Kunde inte spara: ${error.message}`); }
 }
 function exportDxf() {
+  if (!projectWorkspace.active) return;
   try {
     if (!documentWorkflow.exportDXF()) return;
     log("DXF exporterad · block, attribut, bågpolylinjer och native mått bevaras.");
@@ -2012,7 +2053,7 @@ $("#export-sheet").onclick = () => {
 };
 resize();
 activateProject(initialProject);
-if (!initialProject.context) fit();
+if (initialProject && !initialProject.context) fit();
 prompt();
 log(
   "LiraCAD 0.1 · Skriv ett kommando, välj ett verktyg eller öppna Snabbguide.",
@@ -2027,6 +2068,7 @@ if(restored.recoveryError){
 }
 
 setupPWA(async () => {
+  if (!projectWorkspace.active) return;
   if (blockEditor)
     return "Spara eller avbryt blockredigeringen före uppdatering.";
   if (tool || drag)

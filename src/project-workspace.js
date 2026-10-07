@@ -25,9 +25,9 @@ export class ProjectWorkspace {
       if (raw != null) {
         const value = JSON.parse(raw);
         const all = [...(value.open || []), ...(value.closed || [])];
-        if (value.version !== 1 || !Array.isArray(value.open) || !value.open.length || !Array.isArray(value.closed) ||
+        if (value.version !== 1 || !Array.isArray(value.open) || !Array.isArray(value.closed) ||
           all.some(entry => !entry || !validId(entry.id)) || new Set(all.map(entry => entry.id)).size !== all.length ||
-          !value.open.some(entry => entry.id === value.active)) throw Error('Projektflikarnas sparade lista är ogiltig.');
+          (value.open.length ? !value.open.some(entry => entry.id === value.active) : value.active !== null)) throw Error('Projektflikarnas sparade lista är ogiltig.');
         manifest = value;
       }
     } catch(error) { this.manifestAllowed = false; this.manifestError = error; this.onError(error); }
@@ -67,7 +67,7 @@ export class ProjectWorkspace {
   }
   async close(id) {
     const index = this.entries.findIndex(entry => entry.id === id);
-    if (index < 0 || this.entries.length === 1) return false;
+    if (index < 0) return false;
     const entry = this.entries[index];
     if (!entry.storage.writeAllowed) throw Error('Projektet kan inte autosparas. Spara till fil innan du stänger fliken.');
     await entry.ready;
@@ -77,7 +77,7 @@ export class ProjectWorkspace {
     this.closed = [...this.closed, this.describe(entry)];
     this.entries.splice(index,1);
     const previousActive = this.activeId;
-    if (this.activeId === id) this.activeId = this.entries[Math.min(index,this.entries.length-1)].id;
+    if (this.activeId === id) this.activeId = this.entries[Math.min(index,this.entries.length-1)]?.id || null;
     try { this.persist(true); }
     catch(error) {
       this.entries.splice(index,0,entry); this.closed = previousClosed; this.activeId = previousActive; throw error;
@@ -105,8 +105,9 @@ export class ProjectWorkspace {
     try {
       if (!this.manifestAllowed) throw Error('Fliklistan kan inte sparas utan att skriva över en oläsbar lista.');
       const open = this.entries.filter(entry => entry.registered).map(entry => this.describe(entry));
-      if (!open.length) return;
-      const active = open.some(entry => entry.id === this.activeId) ? this.activeId : open[0].id;
+      // Do not persist an empty list while a new project's first save is pending.
+      if (!open.length && this.entries.length) return;
+      const active = open.some(entry => entry.id === this.activeId) ? this.activeId : open[0]?.id || null;
       this.metadata().setItem(manifestKey,JSON.stringify({version:1,open,closed:this.closed,active}));
       this.manifestError = null;
     } catch(error) { this.manifestError = error; this.onError(error); if(strict)throw error; }
