@@ -10,6 +10,7 @@ import { createEntityInspector } from "./entity-inspector.js";
 import { definitions, aliases, transforms } from "./command-catalog.js";
 import { icons } from "./toolbar-icons.js";
 import { toolbarGroups, toolbarLabels } from "./toolbar-groups.js";
+import { createCommandCompletion } from "./command-completion.js";
 import { createLayerPanel } from "./layer-panel.js";
 import { initializeLiraShell } from "./lira-shell.js";
 import { Editor } from "./editor.js";
@@ -1417,26 +1418,14 @@ canvas.addEventListener("pointerleave", () => {
   }
   schedule();
 });
-input.addEventListener("input", () => {
-  const v = input.value.trim().toUpperCase();
-  if (tool || !v) {
-    $("#suggestions").hidden = true;
-    return;
-  }
-  const list = definitions
-    .filter(([n, , a]) => n.startsWith(v) || a.startsWith(v))
-    .slice(0, 5);
-  $("#suggestions").replaceChildren();
-  for (const [n, l] of list) {
-    const b = document.createElement("button");
-    b.innerHTML = `<b>${n}</b><span>${l}</span>`;
-    b.onclick = () => start(n);
-    $("#suggestions").append(b);
-  }
-  $("#suggestions").hidden = !list.length;
+const commandCompletion = createCommandCompletion({
+  input, popup: $("#suggestions"),
+  enabled: () => !tool && !wblockDialog.picking,
+  submit,
 });
 input.addEventListener("keydown", (ev) => {
   if (ev.isComposing) return;
+  if (commandCompletion.navigate(ev)) return;
   if (["ArrowUp", "ArrowDown"].includes(ev.key) && commandHistory.length) {
     ev.preventDefault();
     historyCursor = Math.max(
@@ -1447,12 +1436,14 @@ input.addEventListener("keydown", (ev) => {
       ),
     );
     input.value = commandHistory[historyCursor] || "";
-    $("#suggestions").hidden = true;
+    commandCompletion.hide();
   }
   if (commandSubmitKey(ev, tool?.phase === "text")) {
     ev.preventDefault();
     ev.stopPropagation();
-    submit(input.value);
+    const value = commandCompletion.resolve();
+    commandCompletion.hide();
+    submit(value);
   }
   // Holding Space must not insert spaces or submit several command steps.
   if (
@@ -1463,14 +1454,6 @@ input.addEventListener("keydown", (ev) => {
     !ev.altKey
   )
     ev.preventDefault();
-  if (ev.key === "Tab" && !$("#suggestions").hidden) {
-    ev.preventDefault();
-    const b = $("#suggestions button b");
-    if (b) {
-      input.value = b.textContent;
-      $("#suggestions").hidden = true;
-    }
-  }
 });
 document.addEventListener("keydown", (ev) => {
   const editing = ev.target.matches(
