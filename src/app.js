@@ -1046,6 +1046,7 @@ function resolveCursor() {
   snap = null;
   const active =
     tool?.phase === "points" ||
+    (tool?.name === "WBLOCK" && tool.phase === "dialogBase") ||
     (tool?.name === "OFFSET" && tool.phase === "distance") ||
     drag?.kind === "grip";
   const base = drag?.kind === "grip" ? drag.grip.p : tool?.points.at(-1);
