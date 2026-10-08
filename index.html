@@ -26,7 +26,12 @@
         <span id="pwa-status" role="status"></span>
         <button id="install-app" hidden>Installera app</button>
         <button id="update-app" hidden>Ny version – uppdatera</button>
-        <button id="settings-button">Inställningar</button>
+        <button id="settings-button" aria-label="Inställningar" title="Inställningar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m9 3-.6 2.4-1.2.7-2.4-.7-3 5.2 1.8 1.7v1.4l-1.8 1.7 3 5.2 2.4-.7 1.2.7L9 23h6l.6-2.4 1.2-.7 2.4.7 3-5.2-1.8-1.7v-1.4l1.8-1.7-3-5.2-2.4.7-1.2-.7L15 3Z" transform="translate(1.2 0) scale(.9)"/>
+            <circle cx="12" cy="12" r="3.2"/>
+          </svg>
+        </button>
         <button id="queued-files" hidden>Öppna väntande filer</button>
         <button id="last-import" hidden>Importrapport</button><button id="open-file">Öppna projekt</button
         ><button id="save-file">Spara projekt</button
@@ -247,21 +252,7 @@
         </select>
       </label>
       <section class="settings-section">
-        <h3>DWG och DXF som standard i Windows</h3>
-        <p>Installera LiraCAD via Microsoft Edge eller Google Chrome.
-          Högerklicka sedan på en DWG-fil i Utforskaren, välj <strong>Öppna med</strong>
-          och LiraCAD, och välj att alltid använda appen. Gör samma sak för DXF.</p>
-        <p id="file-launch-status" role="status"></p>
-        <p>Filerna öppnas lokalt i nya projektflikar. Spara ändringar som LiraCAD-projekt
-          eller exportera DXF. Om LiraCAD saknas i listan,
-          uppdatera den installerade appen och starta om den. Om filtyperna fortfarande
-          saknas, avinstallera och installera appen igen från samma adress.
-          Säkerhetskopiera dina projekt till fil först.</p>
-      </section>
-      <section class="settings-section">
         <h3>Exempel och stresstest</h3>
-        <p>Generera en ny ritning för att prova verktygen eller testa prestandan.
-          Ritningen öppnas i en ny projektflik. Dina andra projekt finns kvar.</p>
         <button id="generate-example">Generera exempelritning</button>
         <label class="settings-field">Antal objekt
           <select id="stress-count">
@@ -276,8 +267,6 @@
             <option value="lines">Enbart linjer</option>
           </select>
         </label>
-        <p>Blandade objekt innehåller linjer, cirklar, bågar, polylinjer och text.
-          Prova zoom, markering, snappning och sparande i den genererade ritningen.</p>
         <button class="primary" id="generate-stress">Generera stresstest</button>
         <p id="generation-status" role="status" aria-live="polite"></p>
       </section>

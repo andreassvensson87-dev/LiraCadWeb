@@ -2221,10 +2221,7 @@ setupPWA(async () => {
 });
 
 initializeLiraShell();
-const fileLaunchSupported = setupFileLaunch(fileOpenQueue);
-$("#file-launch-status").textContent = fileLaunchSupported
-  ? "Filöppning från operativsystemet stöds i den här webbläsaren. LiraCAD behöver vara installerad som app för att visas i Windows."
-  : "Den här webbläsaren saknar filöppning från operativsystemet. Installera LiraCAD med Edge eller Chrome på Windows. Öppna projekt fungerar här.";
+setupFileLaunch(fileOpenQueue);
 
 for (const [id, factor] of [["#zoom-out", 1 / 1.25], ["#zoom-in", 1.25]]) {
   $(id).onclick = () => {

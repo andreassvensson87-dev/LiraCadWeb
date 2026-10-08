@@ -145,6 +145,11 @@ button.primary:hover {
 .file-actions button:hover {
   background: #2b484d;
 }
+#settings-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .file-actions button.primary {
   color: #173a2f;
 }
