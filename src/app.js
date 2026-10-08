@@ -58,7 +58,7 @@ import {
   withAttributeText,
 } from "./blocks.js";
 import { setupPWA } from "./pwa.js";
-import { createFileOpenQueue, setupFileLaunch } from "./file-launch.js";
+import { createFileOpenQueue, setupFileLaunch, setupFileDrop } from "./file-launch.js";
 import { layoutSVG } from "./plot.js";
 import {
   spaceOf,
@@ -2131,6 +2131,9 @@ $("#queued-files").onclick = () => {
   if (blockEditor) log("Avsluta blockredigeringen först. Filerna finns kvar i kön.");
   else fileOpenQueue.resume();
 };
+setupFileDrop(fileOpenQueue, {
+  onActive: active => { $("#file-drop-hint").hidden = !active; },
+});
 $("#file-input").onchange = ev => {
   const files = Array.from(ev.target.files);
   ev.target.value = "";

@@ -16,6 +16,10 @@
 * {
   box-sizing: border-box;
 }
+#file-drop-hint:not([hidden]) { position: fixed; inset: 12px; z-index: 10000; pointer-events: none; display: grid; place-items: center; border: 3px dashed #76dfb5; border-radius: 12px; background: #17292ecc; color: #fff; }
+#file-drop-hint > div { display: grid; gap: 10px; text-align: center; padding: 26px; }
+#file-drop-hint strong { font-size: 24px; }
+#file-drop-hint span { font-size: 14px; color: #c3d6ce; }
 body {
   margin: 0;
   height: 100dvh;
@@ -256,7 +260,8 @@ main {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 290px;
+  /* Keep the canvas stationary when selection or inspector tab changes. */
+  grid-template-columns: minmax(0, 1fr) 360px;
 }
 .workspace {
   position: relative;
@@ -915,7 +920,7 @@ dialog p {
 }
 @media (max-width: 1150px) {
   main {
-    grid-template-columns: minmax(0, 1fr) 250px;
+    grid-template-columns: minmax(0, 1fr) 290px;
   }
   .tool-group button {
     min-width: 43px;
@@ -1434,7 +1439,6 @@ body[data-lira-app="cad"] .workspace {
 #properties-panel .block-instance .block-parameter-field { grid-template-columns: minmax(80px,.7fr) minmax(0,1.3fr) 20px; }
 .block-unit { color: #718079; font-size: 11px; }
 @media (min-width: 900px) {
-  body[data-lira-app="cad"]:has(#properties-panel .block-instance):not(.lira-inspector-collapsed) main { grid-template-columns: minmax(0,1fr) clamp(290px,36vw,360px); }
   body[data-lira-app="cad"]:has(#properties-panel .block-instance):not(.lira-inspector-collapsed) main > aside:not(.page-strip) > .inspector-header { min-height: 44px; padding: 10px 44px 10px 16px; }
   #properties-panel:has(.block-instance) { padding: 12px 16px; }
 }
@@ -1502,7 +1506,6 @@ body[data-lira-app="cad"] .workspace {
 .inspector-tabs { display: flex; flex-shrink: 0; padding: 0 14px; border-bottom: 1px solid #dfe7e2; gap: 8px; }
 .inspector-tabs button { padding: 11px 6px 9px; border: 0; border-bottom: 2px solid transparent; font-size: 12px; color: #64756c; background: transparent; cursor: pointer; }
 .inspector-tabs button[aria-selected="true"] { border-bottom-color: #16835f; color: #283b32; font-weight: 600; }
-body[data-lira-app="cad"].catalog-open:not(.lira-inspector-collapsed) main { grid-template-columns: minmax(0, 1fr) clamp(290px, 36vw, 360px); }
 body[data-lira-app].lira-inspector-collapsed .inspector-tabs { display: none; }
 #catalog-panel { display: flex; flex-direction: column; padding: 0 16px; flex: 1; min-height: 0; overflow: hidden; font-size: 12px; color: #283b32; }
 .catalog-browser { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }

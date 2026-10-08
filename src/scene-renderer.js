@@ -195,6 +195,18 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
         ctx.stroke();
         ctx.restore();
       }
+      if (activeSpace === "model") {
+        // World axes stay visible without the grid and use screen-pixel widths.
+        const origin = screen({ x: 0, y: 0 });
+        const extent = Math.hypot(width, height) + Math.hypot(origin.x, origin.y);
+        ctx.save();
+        ctx.translate(origin.x, origin.y);
+        ctx.rotate(-(camera.rotation || 0));
+        ctx.fillStyle = "#425c63";
+        ctx.fillRect(-extent, -0.4, extent * 2, 0.8);
+        ctx.fillRect(-0.4, -extent, 0.8, extent * 2);
+        ctx.restore();
+      }
       if (activeSpace === "model") paintEntities("model");
       else paintLayout();
       if (activeSpace === 'model') {

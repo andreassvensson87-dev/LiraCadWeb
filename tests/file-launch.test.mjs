@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createFileOpenQueue, setupFileLaunch } from '../src/file-launch.js';
+import { createFileOpenQueue, setupFileLaunch, setupFileDrop } from '../src/file-launch.js';
 
 test('Windows manifest registers DWG and DXF within root and subdirectory scope', () => {
  const manifest=JSON.parse(readFileSync(new URL('../manifest.webmanifest',import.meta.url)));
@@ -33,4 +33,35 @@ test('unsupported file launch API and normal non-file startup leave workspace al
  const opened=[];const queue=createFileOpenQueue({openFile:async f=>opened.push(f.name)});
  assert.equal(setupFileLaunch(queue,{}),false);let consume;setupFileLaunch(queue,{launchQueue:{setConsumer:f=>consume=f}});
  await consume({});assert.deepEqual(opened,[]);
+});
+
+function drag(target, type, files = [], types = ['Files'], relatedTarget = {}) {
+ const event = new Event(type, { cancelable: true });
+ event.dataTransfer = { types, files, dropEffect: 'none' };
+ event.relatedTarget = relatedTarget;
+ target.dispatchEvent(event);
+ return event;
+}
+test('dropped files use the open queue, prevent browser navigation and survive a blocked editor', async () => {
+ const target = new EventTarget(), host = new EventTarget(), opened = [], errors = [], active = [];
+ let ready = false;
+ const queue = createFileOpenQueue({ canOpen:()=>ready, openFile:async file=>opened.push(file.name), onError:error=>errors.push(error.message) });
+ const dispose = setupFileDrop(queue, {target,host,onActive:value=>active.push(value)});
+ drag(target,'dragenter'); drag(target,'dragenter'); drag(target,'dragleave');
+ assert.equal(active.at(-1),true);
+ const over = drag(target,'dragover'); assert(over.defaultPrevented); assert.equal(over.dataTransfer.dropEffect,'copy');
+ const drop = drag(target,'drop',[{name:'a.dwg'},{name:'bad.exe'},{name:'b.DXF'}]);
+ assert(drop.defaultPrevented); assert.equal(active.at(-1),false);
+ await queue.resume(); assert.equal(queue.pending,3); assert.deepEqual(opened,[]);
+ ready=true; await queue.resume(); assert.deepEqual(opened,['a.dwg','b.DXF']); assert.equal(errors.length,1);
+ dispose(); assert.equal(drag(target,'drop',[{name:'c.dwg'}]).defaultPrevented,false);
+});
+test('text drags remain untouched and cancelled file drags hide the hint', () => {
+ const target=new EventTarget(),host=new EventTarget(),active=[];
+ setupFileDrop({enqueueFiles(){throw Error('unexpected file');}},{target,host,onActive:value=>active.push(value)});
+ assert.equal(drag(target,'dragover',[],['text/plain']).defaultPrevented,false);
+ assert.equal(drag(target,'drop',[],['text/plain']).defaultPrevented,false);
+ assert.deepEqual(active,[]);
+ drag(target,'dragenter'); drag(target,'dragleave',[],[],null); assert.equal(active.at(-1),false);
+ drag(target,'dragenter'); host.dispatchEvent(new Event('blur')); assert.equal(active.at(-1),false);
 });

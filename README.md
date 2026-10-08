@@ -48,6 +48,7 @@ Flytta, kopiera, rotera, skala och spegla fungerar för flerval. Spegla ersätte
 ## Filer
 
 - **Spara projekt** laddar ned en `.liracad`-fil; **Öppna projekt** läser tillbaka den.
+- Dra och släpp DWG, DXF eller LiraCAD-projekt i programfönstret för att öppna dem i egna projektflikar. Flera filer öppnas i turordning. Under blockredigering väntar de i kön tills du väljer **Öppna väntande filer**.
 - Dokumentet autosparas i webbläsarens IndexedDB. Befintliga lokala utkast migreras automatiskt och tas bort ur den äldre lagringen först när flytten har sparats. Toppraden visar när sparningen är klar eller har misslyckats. Spara till fil för en separat säkerhetskopia. Ångrahistoriken bevaras under sessionen, inte efter omladdning.
 - **Exportera DXF** skriver DXF R2007 (UTF-8) med millimeter, lager/färger och native LINE, LWPOLYLINE, CIRCLE, ARC, TEXT, MTEXT, LEADER och HATCH. Leaderns text skrivs som separat TEXT/MTEXT, utan associativ koppling.
 - **DWG- och ASCII DXF-import finns i en första version.** Se importstöd och begränsningar nedan.
