@@ -2,7 +2,15 @@ import { number } from "./geometry.js";
 import { aciColors } from "./dxf-colors.js";
 
 const aciNames = [
-  "Röd", "Gul", "Grön", "Cyan", "Blå", "Magenta", "Vit", "Grå", "Ljusgrå",
+  "Röd",
+  "Gul",
+  "Grön",
+  "Cyan",
+  "Blå",
+  "Magenta",
+  "Vit",
+  "Grå",
+  "Ljusgrå",
 ];
 // Import and picker share RGB values. Duplicate ACI values use the first name,
 // since document colors are stored as RGB rather than as palette indices.
@@ -12,12 +20,18 @@ for (let index = 1; index < aciColors.length; index++) {
   const color = aciColors[index];
   if (seenColors.has(color)) continue;
   seenColors.add(color);
-  const name = aciNames[index - 1] || (index === 30 ? "Orange" : color === "#000000" ? "Svart" : null);
-  standardColors.push([name ? `${name} (ACI ${index})` : `ACI ${index}`, color]);
+  const name =
+    aciNames[index - 1] ||
+    (index === 30 ? "Orange" : color === "#000000" ? "Svart" : null);
+  standardColors.push([
+    name ? `${name} (ACI ${index})` : `ACI ${index}`,
+    color,
+  ]);
 }
 
 // Reusable controls emit callbacks; document mutations belong to their caller.
 export function createInspectorControls({ document, onInvalid }) {
+  const sectionState = new Map();
   function field(label, value, change, type = "number") {
     const wrapper = document.createElement("label");
     wrapper.className = "field";
@@ -68,9 +82,13 @@ export function createInspectorControls({ document, onInvalid }) {
     return wrapper;
   }
   function section(title) {
-    const el = document.createElement("div");
+    const el = document.createElement(title ? "details" : "div");
     el.className = "inspector-section";
-    const h = document.createElement("div");
+    if (title) {
+      el.open = sectionState.get(title) ?? true;
+      el.addEventListener("toggle", () => sectionState.set(title, el.open));
+    }
+    const h = document.createElement(title ? "summary" : "div");
     h.className = "section-title";
     h.textContent = title;
     if (title) el.append(h);
@@ -136,9 +154,13 @@ export function createInspectorControls({ document, onInvalid }) {
     const entries = [
       ...(value === "mixed" ? [["mixed", "Blandat", null]] : []),
       ["layer", "Enligt lager", layerColor],
-      ...standardColors.filter(([name]) => !name.startsWith("ACI ")).map(([name, color]) => [color, name, color]),
+      ...standardColors
+        .filter(([name]) => !name.startsWith("ACI "))
+        .map(([name, color]) => [color, name, color]),
       ["custom", "Egen kulör…", selected === "custom" ? value : null],
-      ...standardColors.filter(([name]) => name.startsWith("ACI ")).map(([name, color]) => [color, name, color]),
+      ...standardColors
+        .filter(([name]) => name.startsWith("ACI "))
+        .map(([name, color]) => [color, name, color]),
     ];
     const contents = (element, name, color) => {
       const swatch = document.createElement("span");

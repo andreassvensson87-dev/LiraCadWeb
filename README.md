@@ -1,6 +1,6 @@
 # LiraCAD Web 0.1
 
-Första interaktiva utgåvan för att prova CAD-känslan. Kör lokalt på http://127.0.0.1:5174.
+Första interaktiva utgåvan för att prova CAD-känslan. Kör lokalt på http://127.0.0.1:5174. Porten kan ändras med `LIRACAD_PORT`.
 
 ## Starta
 
@@ -56,7 +56,7 @@ Flytta, kopiera, rotera, skala och spegla fungerar för flerval. Spegla ersätte
 
 ## Teknik och begränsningar
 
-Modulär JavaScript utan byggberoenden. Ren geometri, objektoperationer, dokumentvalidering, transaktioner, kommandon, presentation och filformat har egna moduler. `src/core.js` är en kompatibilitetsfasad. `src/app.js` kopplar ihop modulerna och innehåller ännu viss interaktion/UI. Se [arkitekturen](docs/architecture.md) för ansvar och regler för vidareutveckling. Denna första utgåva använder Canvas 2D och omritning vid ändringar via requestAnimationFrame. Stora produktionsritningar är ännu inte prestandaverifierade; nästa rendering/indexering väljs efter mätningar. Historiken sparar dokumentkopior, begränsade till 80 transaktioner, och behöver effektiviseras för stora filer.
+Modulär JavaScript utan byggberoenden. Ren geometri, objektoperationer, dokumentvalidering, transaktioner, kommandon, presentation och filformat har egna moduler. `src/core.js` är en kompatibilitetsfasad. `src/app.js` är startfil. `src/cad-application.js` kopplar ihop separata controllerer för UI, kommandon, markering, snappning, projekt, block, layout och rendering. Se [arkitekturen](docs/architecture.md) för ansvar och regler för vidareutveckling. Denna första utgåva använder Canvas 2D och omritning vid ändringar via requestAnimationFrame. Stora produktionsritningar är ännu inte prestandaverifierade; nästa rendering/indexering väljs efter mätningar. Historiken sparar dokumentkopior, begränsade till 80 transaktioner, och behöver effektiviseras för stora filer.
 
 Desktop med mus/tangentbord är målplattform. Hatch stöder polygoner, hål och importerade linjemönster med flera riktningar och streck/gap. Textmått använder samma layout som visningen (approximation utan tillgängliga originaltypsnitt). SHX-tolkning, AutoCADs dynamiska blockfunktioner och generell 3D ingår inte. LiraCAD har egna stretchparametrar för block, se nedan. Måttobjekt och paperspace finns nu, med begränsningar nedan.
 

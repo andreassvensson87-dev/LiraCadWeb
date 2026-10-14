@@ -35,6 +35,8 @@ http
       res.end("Not found");
     }
   })
-  .listen(5174, "127.0.0.1", () =>
-    console.log("LiraCAD Web: http://127.0.0.1:5174"),
+  .listen(Number(process.env.LIRACAD_PORT || 5174), "127.0.0.1", () =>
+    console.log(
+      `LiraCAD Web: http://127.0.0.1:${process.env.LIRACAD_PORT || 5174}`,
+    ),
   );

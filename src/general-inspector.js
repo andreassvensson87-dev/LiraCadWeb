@@ -1,7 +1,14 @@
 import { transforms } from "./command-catalog.js";
 import { lineTypes } from "./linetypes.js";
 
-export function createGeneralInspector({ document, choice, colorFields, getContext, changeProperty }) {
+export function createGeneralInspector({
+  document,
+  choice,
+  colorFields,
+  section,
+  getContext,
+  changeProperty,
+}) {
   function layerSelect(onChange, value) {
     const label = document.createElement("label");
     label.className = "field";
@@ -25,7 +32,8 @@ export function createGeneralInspector({ document, choice, colorFields, getConte
     return label;
   }
   function render(root) {
-    const { doc, tool, es, activeLayer, creationColor, creationLineType } = getContext();
+    const { doc, tool, es, activeLayer, creationColor, creationLineType } =
+      getContext();
     const creating =
       tool &&
       !transforms.includes(tool.name) &&
@@ -51,10 +59,11 @@ export function createGeneralInspector({ document, choice, colorFields, getConte
           ? (targets[0][key] ?? fallback)
           : "mixed"
         : fallback;
-    const change = (key, value) => changeProperty(key, value, { source, hasTargets: targets.length > 0 });
+    const change = (key, value) =>
+      changeProperty(key, value, { source, hasTargets: targets.length > 0 });
     const layer = shared("layer", activeLayer);
-    const group = document.createElement("div");
-    group.className = "general-properties";
+    const group = section("Utseende");
+    group.classList.add("general-properties");
     group.append(
       layerSelect((v) => change("layer", v), layer === "mixed" ? "" : layer),
     );
