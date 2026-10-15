@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { usesIsoFont, displayFontFamily } from "../src/cad-fonts.js";
-import { textLayout, applyTextProperty, mtextContent } from "../src/text.js";
-import { toDXF } from "../src/dxf-export.js";
-import { importDXF } from "../src/dxf-import.js";
+import { usesIsoFont, displayFontFamily } from "../src/rendering/cad-fonts.js";
+import { textLayout, applyTextProperty, mtextContent } from "../src/model/text.js";
+import { toDXF } from "../src/io/dxf-export.js";
+import { importDXF } from "../src/io/dxf-import.js";
 
 test("ISO fallback preserves local TrueType priority and recognizes only known CAD families", () => {
   assert.equal(displayFontFamily({font:"isocpeur",sourceFont:"C:\\fonts\\ISOCPEUR.TTF"}, "isocpeur"), '"isocpeur", "LiraCAD ISO", "Arial Narrow", Arial, sans-serif');

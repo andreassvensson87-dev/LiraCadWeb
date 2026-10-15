@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import { textLayout, applyTextProperty } from '../src/text.js';
-import { validDocument } from '../src/document.js';import { toDXF } from '../src/dxf-export.js';import { importDXF } from '../src/dxf-import.js';import { transformed } from '../src/entity-transform.js';import { layoutSVG } from '../src/plot.js';import { bounds } from '../src/entity-geometry.js';
+import { textLayout, applyTextProperty } from '../src/model/text.js';
+import { validDocument } from '../src/model/document.js';import { toDXF } from '../src/io/dxf-export.js';import { importDXF } from '../src/io/dxf-import.js';import { transformed } from '../src/model/entity-transform.js';import { layoutSVG } from '../src/rendering/plot.js';import { bounds } from '../src/model/entity-geometry.js';
 const e={id:'t',layer:'0',type:'text',text:'AA\nBB\nCC\nDD',height:10,point:{x:100,y:100},rotation:0,textAttachment:1,textWidth:45,textColumns:{type:2,count:2,width:20,gutter:5,autoHeight:true,reversed:false,heights:[]}},doc={version:1,name:'Columns',layers:[{id:'0',name:'0',visible:true,color:'#ffffff'}],entities:[e]};
 test('balanced columns share geometry between bounds, canvas layout and SVG; reversed flow changes positions',()=>{
  const layout=textLayout(e);assert.equal(layout.width,45);assert.deepEqual(layout.lines.map(l=>l.column),[0,0,1,1]);assert.equal(layout.lines[2].x,25);assert.equal(layout.lines[2].y,10);assert.equal(layout.bottom,24);

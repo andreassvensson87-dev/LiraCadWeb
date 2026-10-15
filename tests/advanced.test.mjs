@@ -16,10 +16,10 @@ import {
   insertVertex,
   removeVertex,
   corner,
-} from "../src/editing.js";
-import { dimensionParts } from "../src/dimensions.js";
-import { viewportCamera, viewportFromCamera } from "../src/layout.js";
-import { layoutSVG } from "../src/plot.js";
+} from "../src/model/editing.js";
+import { dimensionParts } from "../src/model/dimensions.js";
+import { viewportCamera, viewportFromCamera } from "../src/model/layout.js";
+import { layoutSVG } from "../src/rendering/plot.js";
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 const rect = {
   id: "p",

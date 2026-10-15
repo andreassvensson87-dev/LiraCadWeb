@@ -1,13 +1,13 @@
-import {DocumentSession} from '../../src/document-session.js';
-import {stressDocument} from '../../src/stress-document.js';
-import {createSpatialIndex} from '../../src/spatial-index.js';
-import {nearbySnaps} from '../../src/snapping.js';
-import {createLocalSnapIndex} from '../../src/local-snapping.js';
-import {bounds} from '../../src/entity-geometry.js';
-import {applyTransformChange} from '../../src/transform-tools.js';
-import {transformed} from '../../src/entity-transform.js';
-import {applyEditingChange} from '../../src/editing-tools.js';
-import {IndexedDBProjectStore} from '../../src/indexeddb-project-store.js';
+import {DocumentSession} from '../../src/model/document-session.js';
+import {stressDocument} from '../../src/examples/stress-document.js';
+import {createSpatialIndex} from '../../src/model/spatial-index.js';
+import {nearbySnaps} from '../../src/editor/snapping.js';
+import {createLocalSnapIndex} from '../../src/editor/local-snapping.js';
+import {bounds} from '../../src/model/entity-geometry.js';
+import {applyTransformChange} from '../../src/tools/transform-tools.js';
+import {transformed} from '../../src/model/entity-transform.js';
+import {applyEditingChange} from '../../src/tools/editing-tools.js';
+import {IndexedDBProjectStore} from '../../src/storage/indexeddb-project-store.js';
 const button=document.querySelector('#edit-run'),output=document.querySelector('#edit-result');
 button.onclick=async()=>{
   button.disabled=true;output.textContent='Mäter redigering, historik och sparning…';

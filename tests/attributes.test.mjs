@@ -6,12 +6,12 @@ import {
   validAttributeSchema,
   sortedAttributes,
   validAttributeDate,
-} from "../src/attributes.js";
+} from "../src/model/attributes.js";
 import {
   createBlock,
   insertBlock,
   updateBlockDefinition,
-} from "../src/blocks.js";
+} from "../src/model/blocks.js";
 import { validDocument, toDXF } from "../src/core.js";
 const layer = { id: "0", name: "0", color: "#ffffff" };
 const part = {

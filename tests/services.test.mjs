@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ProjectStorage } from "../src/project-storage.js";
-import { readDrawingFile } from "../src/file-import.js";
-import { History } from "../src/history.js";
+import { ProjectStorage } from "../src/storage/project-storage.js";
+import { readDrawingFile } from "../src/io/file-import.js";
+import { History } from "../src/model/history.js";
 import { demoDocument, validDocument } from "../src/core.js";
 
 const file = (name = "example.dwg") => ({

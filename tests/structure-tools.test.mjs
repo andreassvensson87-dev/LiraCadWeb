@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Editor } from "../src/editor.js";
-import { structureTools } from "../src/structure-tools.js";
-import { applyEditingChange } from "../src/editing-tools.js";
-import { createBlock } from "../src/blocks.js";
-import { DocumentSession } from "../src/document-session.js";
-import { demoDocument } from "../src/demo-document.js";
+import { Editor } from "../src/editor/editor.js";
+import { structureTools } from "../src/tools/structure-tools.js";
+import { applyEditingChange } from "../src/tools/editing-tools.js";
+import { createBlock } from "../src/model/blocks.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { demoDocument } from "../src/examples/demo-document.js";
 const a = { id: "a", type: "line", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], color: "#123456", lineType: "DASHED" };
 const b = { ...a, id: "b", points: [{ x: 10, y: 0 }, { x: 10, y: 10 }] };
 function setup(entities = [a, b], ids = ["a", "b"]) {

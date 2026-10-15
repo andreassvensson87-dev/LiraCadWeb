@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Editor } from "../src/editor.js";
-import { dimensionTools } from "../src/dimension-tools.js";
-import { DocumentSession } from "../src/document-session.js";
-import { applyEditingChange } from "../src/editing-tools.js";
+import { Editor } from "../src/editor/editor.js";
+import { dimensionTools } from "../src/tools/dimension-tools.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { applyEditingChange } from "../src/tools/editing-tools.js";
 
 const p = (x, y) => ({ x, y });
 function harness(entities = []) {

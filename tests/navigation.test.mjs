@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { wheelNavigation, commandSubmitKey } from "../src/navigation.js";
+import { wheelNavigation, commandSubmitKey } from "../src/editor/navigation.js";
 test("two-finger scroll pans both axes without changing zoom", () => {
   assert.deepEqual(
     wheelNavigation({ deltaX: 24, deltaY: -37, deltaMode: 0, ctrlKey: false }),

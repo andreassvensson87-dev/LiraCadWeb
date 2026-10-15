@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createImportPackage } from '../src/import-package.js';
-import { readDrawingFile } from '../src/file-import.js';
+import { createImportPackage } from '../src/io/import-package.js';
+import { readDrawingFile } from '../src/io/file-import.js';
 
 async function entries(blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer()), view = new DataView(bytes.buffer);

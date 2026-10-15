@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {annotationEntity,viewportEntities} from '../src/annotation-context.js';
-import {importDXF} from '../src/dxf-import.js';
-import {toDXF} from '../src/dxf-export.js';
-import {validDocument} from '../src/document.js';
-import {transformed} from '../src/entity-transform.js';
-import {layoutSVG} from '../src/plot.js';
+import {annotationEntity,viewportEntities} from '../src/model/annotation-context.js';
+import {importDXF} from '../src/io/dxf-import.js';
+import {toDXF} from '../src/io/dxf-export.js';
+import {validDocument} from '../src/model/document.js';
+import {transformed} from '../src/model/entity-transform.js';
+import {layoutSVG} from '../src/rendering/plot.js';
 const layers=[{id:'0',name:'0',color:'#ffffff',lineType:'CONTINUOUS'}];
 const base={point:{x:0,y:0},scale:50,rotation:0,mirrored:false};
 const contexts=[{...base,denominator:50},{point:{x:200,y:100},scale:20,rotation:Math.PI/2,mirrored:false,denominator:20}];

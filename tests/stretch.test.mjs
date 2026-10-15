@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {stretchWindow,stretchTarget,stretchEntity} from '../src/stretch.js';import {stretchTools} from '../src/stretch-tools.js';
-import {annotationView,storeAnnotationView} from '../src/annotation-edit.js';
-import {withParameterValue,parameterGrips,moveParameterGrip,blockWorldPoint} from '../src/parametric-blocks.js';
-import {blockParts,withAttributeText,insertBlock} from '../src/blocks.js';import {validDocument} from '../src/document.js';import {DocumentSession} from '../src/document-session.js';import {BlockEditSession} from '../src/block-edit-session.js';import {grips,gripEntity} from '../src/grips.js';import {toDXF} from '../src/dxf-export.js';import {importDXF} from '../src/dxf-import.js';import {Editor} from '../src/editor.js';
+import {stretchWindow,stretchTarget,stretchEntity} from '../src/model/stretch.js';import {stretchTools} from '../src/tools/stretch-tools.js';
+import {annotationView,storeAnnotationView} from '../src/model/annotation-edit.js';
+import {withParameterValue,parameterGrips,moveParameterGrip,blockWorldPoint} from '../src/model/parametric-blocks.js';
+import {blockParts,withAttributeText,insertBlock} from '../src/model/blocks.js';import {validDocument} from '../src/model/document.js';import {DocumentSession} from '../src/model/document-session.js';import {BlockEditSession} from '../src/editor/block-edit-session.js';import {grips,gripEntity} from '../src/model/grips.js';import {toDXF} from '../src/io/dxf-export.js';import {importDXF} from '../src/io/dxf-import.js';import {Editor} from '../src/editor/editor.js';
 const layers=[{id:'0',name:'0',color:'#ffffff',visible:true,locked:false}],line=(id,a,b)=>({id,type:'line',layer:'0',points:[a,b]}),rect=stretchWindow({x:85,y:-10},{x:110,y:60}),delta={x:50,y:0};
 function block(){const entities=[line('bottom',{x:0,y:0},{x:100,y:0}),line('top',{x:0,y:50},{x:100,y:50}),line('right',{x:100,y:0},{x:100,y:50}),line('inner',{x:90,y:0},{x:90,y:50})];const parameter={id:'width',name:'Bredd',start:{x:0,y:0},end:{x:100,y:0},window:rect,targets:entities.map(e=>stretchTarget(e,rect))};return {id:'b',type:'block',layer:'0',point:{x:0,y:0},scale:1,rotation:0,definition:{id:'def',name:'Window',entities,stretchParameters:[parameter]},values:{}};}
 const documentOf=entities=>({version:1,name:'Stretch',layers,entities});

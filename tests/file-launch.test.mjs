@@ -1,7 +1,8 @@
+import { setupFileDrop } from "../src/ui/file-drop.js";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createFileOpenQueue, setupFileLaunch, setupFileDrop } from '../src/file-launch.js';
+import { createFileOpenQueue, setupFileLaunch } from '../src/io/file-launch.js';
 
 test('Windows manifest registers DWG and DXF within root and subdirectory scope', () => {
  const manifest=JSON.parse(readFileSync(new URL('../manifest.webmanifest',import.meta.url)));

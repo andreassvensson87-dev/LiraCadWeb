@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createCursorController } from "../src/cursor-controller.js";
-import { createEditorState } from "../src/editor-state.js";
-import { createCommandController } from "../src/command-controller.js";
-import { createLocalSnapIndex } from "../src/local-snapping.js";
+import { createCursorController } from "../src/editor/cursor-controller.js";
+import { createEditorState } from "../src/editor/editor-state.js";
+import { createCommandController } from "../src/editor/command-controller.js";
+import { createLocalSnapIndex } from "../src/editor/local-snapping.js";
 
 function fixture({ osnap = true, gridSnap = false, picking = "base" } = {}) {
   const entities = [

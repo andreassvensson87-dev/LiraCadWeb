@@ -1,3 +1,4 @@
+import { sourceFiles as listSources } from "./source-files.mjs";
 import {
   readFile,
   writeFile,
@@ -5,17 +6,21 @@ import {
   readdir,
   copyFile,
   cp,
+  rm,
 } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const out = path.join(root, "dist");
+await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
-const sourceFiles = (await readdir(path.join(root, "src"))).filter((f) =>
-  /\.(js|css)$/.test(f),
+const sourceFiles = (await listSources(path.join(root, "src"))).filter((file) =>
+  /\.(js|css)$/.test(file),
 );
-for (const file of sourceFiles)
+for (const file of sourceFiles) {
+  await mkdir(path.dirname(path.join(out, file)), { recursive: true });
   await copyFile(path.join(root, "src", file), path.join(out, file));
+}
 await cp(path.join(root, "src/vendor"), path.join(out, "vendor"), {
   recursive: true,
 });
@@ -32,7 +37,14 @@ async function vendorFiles(dir, prefix = "vendor") {
 }
 const dwgFiles = await vendorFiles(path.join(root, "src/vendor"));
 sourceFiles.push(...dwgFiles);
-const shared = ["manifest.webmanifest", "lira-icon.svg", "favicon-32.png", "apple-touch-icon.png", "icon-192.png", "icon-512.png"];
+const shared = [
+  "manifest.webmanifest",
+  "lira-icon.svg",
+  "favicon-32.png",
+  "apple-touch-icon.png",
+  "icon-192.png",
+  "icon-512.png",
+];
 for (const file of shared)
   await copyFile(path.join(root, file), path.join(out, file));
 const html = await readFile(path.join(root, "index.html"), "utf8");

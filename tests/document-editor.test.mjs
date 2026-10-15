@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DocumentSession } from "../src/document-session.js";
-import { createDocumentEditor } from "../src/document-editor.js";
-import { createEditorState, updateToolState } from "../src/editor-state.js";
-import { changeEntityGeometry } from "../src/entity-properties.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { createDocumentEditor } from "../src/editor/document-editor.js";
+import { createEditorState, updateToolState } from "../src/editor/editor-state.js";
+import { changeEntityGeometry } from "../src/model/entity-properties.js";
 
 const drawing = (name) => ({
   version: 1,

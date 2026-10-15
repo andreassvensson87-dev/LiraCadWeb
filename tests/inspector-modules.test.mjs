@@ -1,12 +1,13 @@
+import { createInspectorActions } from "../src/editor/inspector-actions.js";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createGeneralInspector } from "../src/general-inspector.js";
-import { createAppearanceInspector } from "../src/appearance-inspector.js";
-import { createAttributeInspector } from "../src/attribute-inspector.js";
-import { createEntityInspector } from "../src/entity-inspector.js";
-import { createLayoutInspector } from "../src/layout-inspector.js";
-import { createBlockInspector } from "../src/block-inspector.js";
-import { DocumentSession } from "../src/document-session.js";
+import { createGeneralInspector } from "../src/ui/general-inspector.js";
+import { createAppearanceInspector } from "../src/ui/appearance-inspector.js";
+import { createAttributeInspector } from "../src/ui/attribute-inspector.js";
+import { createEntityInspector } from "../src/ui/entity-inspector.js";
+import { createLayoutInspector } from "../src/ui/layout-inspector.js";
+import { createBlockInspector } from "../src/ui/block-inspector.js";
+import { DocumentSession } from "../src/model/document-session.js";
 class Element {
   children = []; attrs = {}; classList = { add() {} };
   append(...items) { this.children.push(...items); }
@@ -79,7 +80,7 @@ test("layout callbacks look up draft by identity, validate names and undo remova
   ] });
   const original = session.document, root = new Element(), messages = []; let formats = 0, removed = 0;
   createLayoutInspector({ ...controls, getDocument: () => session.document,
-    commit: (label, change) => session.commit(label, change), log: (m) => messages.push(m), refresh() {}, afterFormat: () => formats++, afterRemove: () => removed++,
+    ...createInspectorActions({model: {get document() {return session.document;}}, commit: (label, change) => session.commit(label, change), activateLayer() {}, cancel: () => removed++, refresh: message => messages.push(message), fit: () => formats++}),
   })(root, "paper");
   const [name, format, , remove] = root.children[0].children;
   for (const value of ["", "Model", "other"]) name.change(value);
@@ -93,16 +94,17 @@ test("layout callbacks look up draft by identity, validate names and undo remova
 });
 test("invalid layout format leaves document intact and does not run post-commit navigation", () => {
   const session = new DocumentSession({ version: 1, name: "Test", layers: [{ id: "0", name: "A", color: "#ffffff" }], layouts: [{ id: "paper", name: "Paper", width: 420, height: 297 }], entities: [] });
-  const original = session.document, root = new Element(); let fitted = 0;
-  createLayoutInspector({ ...controls, getDocument: () => session.document, commit: (label, change) => session.commit(label, change), log() {}, refresh() {}, afterFormat: () => fitted++, afterRemove() {} })(root, "paper");
-  assert.throws(() => root.children[0].children[1].change("0x210"), /ogiltig ritning/);
+  const original = session.document, root = new Element(), messages = []; let fitted = 0;
+  createLayoutInspector({ ...controls, getDocument: () => session.document, ...createInspectorActions({model: {get document() {return session.document;}}, commit: (label, change) => session.commit(label, change), cancel() {}, refresh: message => messages.push(message), fit: () => fitted++}) })(root, "paper");
+  root.children[0].children[1].change("0x210");
+  assert.match(messages.at(-1), /ogiltig ritning/);
   assert.equal(fitted, 0); assert.deepEqual(session.document, original);
 });
 test("block editor fields edit isolated drafts and save/cancel actions are injected", () => {
   const session = new DocumentSession({ version: 1, name: "Block", blockBase: { x: 0, y: 0 }, layers: [{ id: "0", name: "A", color: "#ffffff" }], entities: [] });
   const before = session.document, root = new Element(), actions = [];
   const render = createBlockInspector({ ...controls, getDocument: () => session.document,
-    commit: (label, change) => session.commit(label, change), finishEdit: (save) => actions.push(save), renderAttributeManager() {}, attributeValueField() {}, editSelected() {}, beginEdit() {}, erase() {},
+    ...createInspectorActions({model: {get document() {return session.document;}}, commit: (label, change) => session.commit(label, change), refresh() {}}), startParameter: undefined, finishEdit: (save) => actions.push(save), renderAttributeManager() {}, attributeValueField() {}, editSelected() {}, beginEdit() {}, erase() {},
   });
   render.renderEditor(root); const [name, x, y, save, cancel] = root.children[0].children;
   name.change("NewBlock"); x.change(20); y.change(-10); x.change(NaN);

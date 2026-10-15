@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { paperSnaps } from "../src/layout.js";
+import { paperSnaps } from "../src/model/layout.js";
 test("paper corners and midpoints take priority over continuous edge snaps", () => {
   for (const layout of [
     { width: 420, height: 297 },

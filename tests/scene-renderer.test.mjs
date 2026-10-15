@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSceneRenderer, viewportClip, gridSpacing } from "../src/scene-renderer.js";
-import { viewportCamera } from "../src/layout.js";
-import { createSpatialIndex } from '../src/spatial-index.js';
-import { bounds } from '../src/entity-geometry.js';
+import { createSceneRenderer, viewportClip, gridSpacing } from "../src/rendering/scene-renderer.js";
+import { viewportCamera } from "../src/model/layout.js";
+import { createSpatialIndex } from '../src/model/spatial-index.js';
+import { bounds } from '../src/model/entity-geometry.js';
 const line = (id, points, props = {}) => ({ id, layer: "visible", type: "line", points, ...props });
 function canvas() {
   const calls = [], stack = []; let state = {};

@@ -1,3 +1,4 @@
+import { sourceFiles } from '../scripts/source-files.mjs';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -20,7 +21,8 @@ test("release contains noindex and all precached files exist",async()=>{
  const worker=await readFile("dist/sw.js","utf8");
  const files=JSON.parse(worker.match(/const FILES = (.*);/)[1]);
  for(const file of files) await readFile("dist/"+file);
- assert.ok(files.includes("pwa.js"));
+ assert.ok(files.includes("ui/pwa.js"));
+ for (const file of await sourceFiles("src")) if (/\.(js|css)$/.test(file)) assert.ok(files.includes(file), `Missing owned module in offline cache: ${file}`);
  assert.ok(!files.some(file=>file.includes("artifacts")));
 });
 test("worker keeps versions atomic, serves offline navigation under repository path, blocks multi-window activation",async()=>{

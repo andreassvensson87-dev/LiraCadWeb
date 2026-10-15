@@ -1,10 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {annotationView,createAnnotationView,storeAnnotationView,copyAnnotationView} from '../src/annotation-edit.js';
-import {annotationEntity,viewportEntities} from '../src/annotation-context.js';
-import {transformed} from '../src/entity-transform.js';
-import {validDocument} from '../src/document.js';
-import {importDXF} from '../src/dxf-import.js';import {toDXF} from '../src/dxf-export.js';
-import {createSpatialIndex} from '../src/spatial-index.js';import {bounds,hitDistance} from '../src/entity-geometry.js';import {grips,gripEntity} from '../src/grips.js';
+import {annotationView,createAnnotationView,storeAnnotationView,copyAnnotationView} from '../src/model/annotation-edit.js';
+import {annotationEntity,viewportEntities} from '../src/model/annotation-context.js';
+import {transformed} from '../src/model/entity-transform.js';
+import {validDocument} from '../src/model/document.js';
+import {importDXF} from '../src/io/dxf-import.js';import {toDXF} from '../src/io/dxf-export.js';
+import {createSpatialIndex} from '../src/model/spatial-index.js';import {bounds,hitDistance} from '../src/model/entity-geometry.js';import {grips,gripEntity} from '../src/model/grips.js';
 const layers=[{id:'0',name:'0',color:'#ffffff',lineType:'CONTINUOUS'}];
 const v={annotationScale:20,showAllAnnotations:true},other={annotationScale:50,showAllAnnotations:true};
 const text={id:'t',type:'text',layer:'0',text:'Room',point:{x:0,y:0},height:100,rotation:0,font:'Arial',textAlign:'left',textVertical:'baseline'};

@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createBlock,blockParts,withAttributeText} from '../src/blocks.js';
-import {DocumentSession} from '../src/document-session.js';
-import {validDocument} from '../src/document.js';
-import {toDXF} from '../src/dxf-export.js';
-import {importDXF} from '../src/dxf-import.js';
-import {fitViewportToEntities} from '../src/layout.js';
+import {createBlock,blockParts,withAttributeText} from '../src/model/blocks.js';
+import {DocumentSession} from '../src/model/document-session.js';
+import {validDocument} from '../src/model/document.js';
+import {toDXF} from '../src/io/dxf-export.js';
+import {importDXF} from '../src/io/dxf-import.js';
+import {fitViewportToEntities} from '../src/model/layout.js';
 const attribute={id:'a',type:'text',layer:'0',point:{x:12,y:24},height:2,text:'Original',attributeTag:'TAG',font:'Arial',widthFactor:0.8,rotation:0.2};
 const template=createBlock([attribute],'Stamp',{x:0,y:0},'0');
 const doc=entities=>({version:1,name:'Test',layers:[{id:'0',name:'Text',color:'#ffffff'}],entities});

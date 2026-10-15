@@ -5,10 +5,10 @@ import { createHash } from 'node:crypto';
 import { readFile, mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { importDXF } from '../src/dxf-import.js';
-import { toDXF } from '../src/dxf-export.js';
-import { validDocument } from '../src/document.js';
-import { annotationView } from '../src/annotation-edit.js';
+import { importDXF } from '../src/io/dxf-import.js';
+import { toDXF } from '../src/io/dxf-export.js';
+import { validDocument } from '../src/model/document.js';
+import { annotationView } from '../src/model/annotation-edit.js';
 await import('./prepare-dwg-source.mjs');
 const fixtures = [
   { name: 'architectural_-_annotation_scaling_and_multileaders.dwg', hash: 'ddaca4e6e14a71a1af86a7f5f711ad51baf95aaaf807c39819d685cde0846d5d', text: 0, mtext: 5, count: 1407, variants: 5, dimensions: 28 },

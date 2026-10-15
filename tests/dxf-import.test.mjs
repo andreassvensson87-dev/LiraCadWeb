@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { importDXF, decodeDXF } from "../src/dxf-import.js";
+import { importDXF, decodeDXF } from "../src/io/dxf-import.js";
 import { toDXF, validDocument, demoDocument } from "../src/core.js";
-import { createBlock, insertBlock } from "../src/blocks.js";
+import { createBlock, insertBlock } from "../src/model/blocks.js";
 const layer = { id: "0", name: "0", color: "#ffffff", lineType: "DASHED" };
 const drawing = (entities) => ({
   version: 1,

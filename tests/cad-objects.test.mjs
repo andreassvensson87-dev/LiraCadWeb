@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { polylineParts } from "../src/polyline.js";
-import { createBlock, blockParts, insertBlock } from "../src/blocks.js";
-import { joinEntities, explodePolyline } from "../src/editing.js";
-import { createSnapIndex, nearbySnaps } from "../src/snapping.js";
+import { polylineParts } from "../src/model/polyline.js";
+import { createBlock, blockParts, insertBlock } from "../src/model/blocks.js";
+import { joinEntities, explodePolyline } from "../src/model/editing.js";
+import { createSnapIndex, nearbySnaps } from "../src/editor/snapping.js";
 import {
   bounds,
   hitDistance,
@@ -13,7 +13,7 @@ import {
   toDXF,
   dist,
 } from "../src/core.js";
-import { dimensionChain } from "../src/dimensions.js";
+import { dimensionChain } from "../src/model/dimensions.js";
 const doc = (entities) => ({
   version: 1,
   name: "Object test",
@@ -131,7 +131,7 @@ test("DXF exports native dimensions and a unique anonymous picture block per cha
 });
 
 test("arc midpoint grip changes curvature while keeping both endpoints", async () => {
-  const { grips, gripEntity } = await import("../src/grips.js");
+  const { grips, gripEntity } = await import("../src/model/grips.js");
   const handle = grips(poly).find((g) => g.kind === "bulge");
   const changed = gripEntity(poly, handle, { x: 5, y: -2 });
   assert.deepEqual(changed.points, poly.points);
@@ -139,7 +139,7 @@ test("arc midpoint grip changes curvature while keeping both endpoints", async (
   assert.ok(validDocument(doc([changed])));
 });
 test("block library survives deletion of all instances and new insertion uses default attributes", async () => {
-  const { blockTemplates } = await import("../src/blocks.js");
+  const { blockTemplates } = await import("../src/model/blocks.js");
   const block = createBlock(
     [
       {

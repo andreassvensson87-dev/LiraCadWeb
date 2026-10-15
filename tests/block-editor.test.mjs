@@ -4,7 +4,7 @@ import {
   createBlock,
   insertBlock,
   updateBlockDefinition,
-} from "../src/blocks.js";
+} from "../src/model/blocks.js";
 import { clone, validDocument, History } from "../src/core.js";
 const layer = { id: "0", name: "0", color: "#ffffff" };
 function fixture() {

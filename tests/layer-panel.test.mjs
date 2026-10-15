@@ -1,7 +1,8 @@
+import { createInspectorActions } from "../src/editor/inspector-actions.js";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createLayerPanel } from "../src/layer-panel.js";
-import { DocumentSession } from "../src/document-session.js";
+import { createLayerPanel } from "../src/ui/layer-panel.js";
+import { DocumentSession } from "../src/model/document-session.js";
 class Element {
   children = [];
   attrs = {};
@@ -21,7 +22,7 @@ function setup() {
     document: { createElement: () => new Element() }, root,
     getDocument: () => session.document, getActiveLayer: () => activeLayer,
     activateLayer: (id) => { activeLayer = id; render(); },
-    commit: (label, change) => { session.commit(label, change); render(); },
+    ...createInspectorActions({model: {get document() {return session.document;}}, commit: (label, change) => { session.commit(label, change); render(); }, activateLayer: id => {activeLayer = id; render();}, refresh: message => { messages.push(message); render(); }}),
     cancel: () => { cancelled++; }, log: (m) => messages.push(m),
     field: (label, value, change) => ({ label, value, change }),
     choice: (label, value, options, change) => ({ label, value, options, change }),

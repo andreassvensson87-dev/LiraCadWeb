@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DocumentSession } from "../src/document-session.js";
+import { DocumentSession } from "../src/model/document-session.js";
 
 const fixture = () => ({
   version: 1, name: "Drawing",

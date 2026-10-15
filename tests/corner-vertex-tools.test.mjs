@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Editor } from "../src/editor.js";
-import { cornerTools } from "../src/corner-tools.js";
-import { vertexTools } from "../src/vertex-tools.js";
-import { applyEditingChange } from "../src/editing-tools.js";
-import { DocumentSession } from "../src/document-session.js";
-import { demoDocument } from "../src/demo-document.js";
+import { Editor } from "../src/editor/editor.js";
+import { cornerTools } from "../src/tools/corner-tools.js";
+import { vertexTools } from "../src/tools/vertex-tools.js";
+import { applyEditingChange } from "../src/tools/editing-tools.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { demoDocument } from "../src/examples/demo-document.js";
 const line = (id, points) => ({ id, type: "line", points, color: "#123456", lineType: "DASHED", space: "model" });
 const a = line("a", [{ x: 0, y: 0 }, { x: 100, y: 0 }]);
 const b = line("b", [{ x: 0, y: 0 }, { x: 0, y: 100 }]);

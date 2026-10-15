@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { stressDocument } from "../src/stress-document.js";
-import { validDocument, MAX_DOCUMENT_ENTITIES } from "../src/document.js";
-import { drawingBounds } from "../src/entity-geometry.js";
-import { createSettingsPanel } from "../src/settings-panel.js";
-import { DocumentSession } from "../src/document-session.js";
+import { stressDocument } from "../src/examples/stress-document.js";
+import { validDocument, MAX_DOCUMENT_ENTITIES } from "../src/model/document.js";
+import { drawingBounds } from "../src/model/entity-geometry.js";
+import { createSettingsPanel } from "../src/ui/settings-panel.js";
+import { DocumentSession } from "../src/model/document-session.js";
 
 for (const count of [1000, 10000, 100000]) test(`stress generator produces ${count} valid objects and finite extents`, async () => {
   let yields = 0, progress = [];

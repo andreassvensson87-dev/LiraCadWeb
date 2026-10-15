@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSelectionController } from "../src/selection-controller.js";
-import { createDocumentEditor } from "../src/document-editor.js";
-import { createEditorState } from "../src/editor-state.js";
-import { DocumentSession } from "../src/document-session.js";
+import { createSelectionController } from "../src/editor/selection-controller.js";
+import { createDocumentEditor } from "../src/editor/document-editor.js";
+import { createEditorState } from "../src/editor/editor-state.js";
+import { DocumentSession } from "../src/model/document-session.js";
 
-import { rectSelect } from "../src/entity-geometry.js";
+import { rectSelect } from "../src/model/entity-geometry.js";
 
-import { grips } from "../src/grips.js";
+import { grips } from "../src/model/grips.js";
 
 function app(initial) {
   const documentSession = new DocumentSession(

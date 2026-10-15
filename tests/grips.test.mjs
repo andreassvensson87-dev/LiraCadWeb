@@ -5,7 +5,7 @@ import {
   gripEntity,
   gripTargets,
   moveGripTargets,
-} from "../src/grips.js";
+} from "../src/model/grips.js";
 import { demoDocument, polar, dist } from "../src/core.js";
 
 test("shared line endpoints move together without moving nearby grips or originals", () => {
@@ -140,7 +140,7 @@ test("arc grip changes preserve the other two defining points for both direction
 });
 
 test("viewport corner resizing crops without moving the model on paper", async () => {
-  const { viewportCamera } = await import("../src/layout.js");
+  const { viewportCamera } = await import("../src/model/layout.js");
   const e = {
     type: "viewport",
     points: [

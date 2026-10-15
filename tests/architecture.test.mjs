@@ -1,25 +1,27 @@
+import path from 'node:path';
+import { sourceFiles } from '../scripts/source-files.mjs';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import * as core from "../src/core.js";
-import * as geometry from "../src/geometry.js";
-import { validDocument } from "../src/document.js";
-import { transform } from "../src/entity-transform.js";
-import { definitions, aliases, transforms } from "../src/command-catalog.js";
-import { drawingTools } from "../src/drawing-tools.js";
-import { stretchTools } from "../src/stretch-tools.js";
-import { wblockTools } from "../src/wblock-tools.js";
-import { transformTools } from "../src/transform-tools.js";
-import { editingTools } from "../src/editing-tools.js";
-import { cornerTools } from "../src/corner-tools.js";
-import { vertexTools } from "../src/vertex-tools.js";
-import { structureTools } from "../src/structure-tools.js";
-import { dimensionTools } from "../src/dimension-tools.js";
-import { blockTools } from "../src/block-tools.js";
-import { viewportTools } from "../src/viewport-tools.js";
-import { annotationTools } from "../src/annotation-tools.js";
-import { utilityTools } from "../src/utility-tools.js";
-import { toolbarGroups } from "../src/toolbar-groups.js";
+import * as geometry from "../src/model/geometry.js";
+import { validDocument } from "../src/model/document.js";
+import { transform } from "../src/model/entity-transform.js";
+import { definitions, aliases, transforms } from "../src/commands/command-catalog.js";
+import { drawingTools } from "../src/tools/drawing-tools.js";
+import { stretchTools } from "../src/tools/stretch-tools.js";
+import { wblockTools } from "../src/tools/wblock-tools.js";
+import { transformTools } from "../src/tools/transform-tools.js";
+import { editingTools } from "../src/tools/editing-tools.js";
+import { cornerTools } from "../src/tools/corner-tools.js";
+import { vertexTools } from "../src/tools/vertex-tools.js";
+import { structureTools } from "../src/tools/structure-tools.js";
+import { dimensionTools } from "../src/tools/dimension-tools.js";
+import { blockTools } from "../src/tools/block-tools.js";
+import { viewportTools } from "../src/tools/viewport-tools.js";
+import { annotationTools } from "../src/tools/annotation-tools.js";
+import { utilityTools } from "../src/tools/utility-tools.js";
+import { toolbarGroups } from "../src/ui/toolbar-groups.js";
 
 const root = new URL("../src/", import.meta.url);
 test("every catalog command has a toolbar home and block workflows stay together", () => {
@@ -77,12 +79,8 @@ test("all interactive catalog commands have one tool owner; block session entry 
   for (const name of ["DIST", "PAN"]) assert.ok(owners.has(name));
 });
 async function modules() {
-  const files = (await readdir(root)).filter((f) => f.endsWith(".js"));
-  return new Map(
-    await Promise.all(
-      files.map(async (f) => [f, await readFile(new URL(f, root), "utf8")]),
-    ),
-  );
+  const files = (await sourceFiles(root)).filter(f => f.endsWith('.js'));
+  return new Map(await Promise.all(files.map(async f => [path.basename(f), await readFile(new URL(f, root), 'utf8')])));
 }
 
 test("internal modules import their owners and form an acyclic dependency graph", async () => {
@@ -90,8 +88,8 @@ test("internal modules import their owners and form an acyclic dependency graph"
   const graph = new Map();
   for (const [file, source] of sources) {
     const refs = [
-      ...source.matchAll(/(?:from\s*|import\s*)["']\.\/([^"']+\.js)["']/g),
-    ].map((m) => m[1]);
+      ...source.matchAll(/(?:from\s*|import\s*)["']\.\.?\/([^"']+\.js)["']/g),
+    ].map((m) => path.basename(m[1]));
     for (const ref of refs) {
       assert.ok(sources.has(ref), `${file} imports missing ${ref}`);
       if (file !== "core.js")
@@ -120,7 +118,7 @@ test("internal modules import their owners and form an acyclic dependency graph"
 });
 
 test("geometry has no app/model/format dependencies and facade preserves public exports", async () => {
-  const source = await readFile(new URL("geometry.js", root), "utf8");
+  const source = await readFile(new URL("model/geometry.js", root), "utf8");
   assert.doesNotMatch(
     source,
     /\bimport\b|\bdocument\.|\bwindow\.|\blocalStorage\b/,

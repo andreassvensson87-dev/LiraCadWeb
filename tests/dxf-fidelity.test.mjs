@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { importDXF } from '../src/dxf-import.js';
-import { toDXF } from '../src/dxf-export.js';
-import { parseMtext } from '../src/dxf-text.js';
-import { textLayout, mtextContent } from '../src/text.js';
-import { splinePoints, ellipsePoints } from '../src/dxf-curves.js';
-import { validDocument } from '../src/document.js';
-import { blockParts, validTag } from '../src/blocks.js';
-import { bounds, hitDistance } from '../src/entity-geometry.js';
-import { transform } from '../src/entity-transform.js';
-import { layoutSVG } from '../src/plot.js';
-import { linePattern } from '../src/linetypes.js';
+import { importDXF } from '../src/io/dxf-import.js';
+import { toDXF } from '../src/io/dxf-export.js';
+import { parseMtext } from '../src/io/dxf-text.js';
+import { textLayout, mtextContent } from '../src/model/text.js';
+import { splinePoints, ellipsePoints } from '../src/io/dxf-curves.js';
+import { validDocument } from '../src/model/document.js';
+import { blockParts, validTag } from '../src/model/blocks.js';
+import { bounds, hitDistance } from '../src/model/entity-geometry.js';
+import { transform } from '../src/model/entity-transform.js';
+import { layoutSVG } from '../src/rendering/plot.js';
+import { linePattern } from '../src/model/linetypes.js';
 const dxf = (entities, tables=[], blocks=[]) => [0,'SECTION',2,'TABLES',...tables,0,'ENDSEC',0,'SECTION',2,'BLOCKS',...blocks,0,'ENDSEC',0,'SECTION',2,'ENTITIES',...entities,0,'ENDSEC',0,'EOF'].join('\n')+'\n';
 const imported = (...args) => importDXF(dxf(...args)).document;
 const text = [0,'TEXT',8,'0',1,'AB',10,10,20,20,40,2];
@@ -91,7 +91,7 @@ test('new presentation properties reject malformed imported project values',()=>
 });
 
 test('rotated viewport camera is invertible and keeps its paper center anchored',async()=>{
- const {viewportCamera,viewportFromCamera}=await import('../src/layout.js');const {screenPoint,worldPoint}=await import('../src/camera.js');
+ const {viewportCamera,viewportFromCamera}=await import('../src/model/layout.js');const {screenPoint,worldPoint}=await import('../src/model/camera.js');
  const viewport={points:[{x:10,y:20},{x:110,y:70}],viewCenter:{x:1000,y:2000},viewScale:0.5,viewRotation:Math.PI/2};const paper={x:60,y:45,scale:2};
  const camera=viewportCamera(viewport,paper,1000,800),center=screenPoint(viewport.viewCenter,camera,1000,800);assert.deepEqual(center,{x:500,y:400});
  const world={x:1100,y:2100},back=worldPoint(screenPoint(world,camera,1000,800),camera,1000,800);assert.deepEqual(back,world);
@@ -155,7 +155,7 @@ test('MTEXT tracking keeps glyphs unchanged while changing advances and survives
  assert.equal(parseMtext('{\\T2;A{\\T0.75x;B}C}').runs[1].tracking,1.5);
 });
 test('text adjustment replaces only its matching span properties and preserves color',async()=>{
- const {applyTextProperty}=await import('../src/text.js');
+ const {applyTextProperty}=await import('../src/model/text.js');
  const e={type:'text',point:{x:0,y:0},text:'AB\nC',height:2,textAttachment:9,textWidth:10,textRuns:[{text:'AB\nC',tracking:2,widthFactor:0.8,paragraphAlign:'left',color:'#ff0000'}]};
  const tracking=applyTextProperty(e,'tracking',1.25);assert.equal(tracking.textRuns[0].tracking,undefined);assert.equal(tracking.textRuns[0].color,'#ff0000');
  const centered=applyTextProperty(tracking,'textAlign','center');assert.equal(centered.textAttachment,8);assert.equal(centered.textRuns[0].paragraphAlign,undefined);
@@ -163,7 +163,7 @@ test('text adjustment replaces only its matching span properties and preserves c
  const doc=imported(text);doc.entities=[{...doc.entities[0],...centered}];const after=importDXF(toDXF(doc)).document.entities[0];assert.equal(after.textAttachment,8);assert.equal(after.textRuns[0].paragraphAlign,'center');assert.equal(after.textRuns[0].tracking,1.25);
 });
 test('adjusted multiline TEXT exports with the same rendered bounds and line alignment',async()=>{
- const {applyTextProperty}=await import('../src/text.js');
+ const {applyTextProperty}=await import('../src/model/text.js');
  const doc=imported([...text,1,'ignored']);let e={...doc.entities[0],text:'LONG\nA',lineSpacing:2.5,rotation:0.3};
  e=applyTextProperty(e,'textAlign','right');doc.entities=[e];const after=importDXF(toDXF(doc)).document.entities[0];
  const a=bounds(e),b=bounds(after);for(const key of ['minX','maxX','minY','maxY'])assert.ok(Math.abs(a[key]-b[key])<1e-8,`${key}: ${a[key]} != ${b[key]}`);

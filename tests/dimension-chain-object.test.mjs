@@ -4,9 +4,9 @@ import {
   dimensionChain,
   dimensionParts,
   extendDimensionChain,
-} from "../src/dimensions.js";
+} from "../src/model/dimensions.js";
 import { validDocument, transformed, toDXF } from "../src/core.js";
-import { grips, gripEntity } from "../src/grips.js";
+import { grips, gripEntity } from "../src/model/grips.js";
 const source = {
   id: "chain",
   type: "dimension",

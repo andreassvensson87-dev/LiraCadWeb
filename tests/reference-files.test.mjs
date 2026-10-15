@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {referencePath,matchReferenceFile,resolveReferenceFiles} from '../src/reference-files.js';
-import {referenceEntities,referenceRows,findReference,referenceStatus,detachReference,bindReference} from '../src/references.js';
-import {validDocument} from '../src/document.js';
-import {DocumentSession} from '../src/document-session.js';
-import {blockParts} from '../src/blocks.js';
+import {referencePath,matchReferenceFile,resolveReferenceFiles} from '../src/io/reference-files.js';
+import {referenceEntities,referenceRows,findReference,referenceStatus,detachReference,bindReference} from '../src/model/references.js';
+import {validDocument} from '../src/model/document.js';
+import {DocumentSession} from '../src/model/document-session.js';
+import {blockParts} from '../src/model/blocks.js';
 const layer={id:'0',name:'0',color:'#ffffff'};
 const drawing=(refs=[],own=true)=>({version:1,layers:[structuredClone(layer)],entities:own?[{id:'line',type:'line',layer:'0',points:[{x:0,y:0},{x:10,y:0}]}]:[],references:refs});
 const ref=(name,props={})=>({id:name,name,path:name,kind:'attach',point:{x:0,y:0},rotation:0,scale:1,fade:60,loaded:true,geometry:[],...props});

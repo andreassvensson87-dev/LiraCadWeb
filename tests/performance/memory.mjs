@@ -1,9 +1,9 @@
-import {createLocalSnapIndex} from '../../src/local-snapping.js';
-import {DocumentSession} from '../../src/document-session.js';
-import {stressDocument} from '../../src/stress-document.js';
-import {createSpatialIndex} from '../../src/spatial-index.js';
-import {nearbySnaps} from '../../src/snapping.js';
-import {bounds} from '../../src/entity-geometry.js';
+import {createLocalSnapIndex} from '../../src/editor/local-snapping.js';
+import {DocumentSession} from '../../src/model/document-session.js';
+import {stressDocument} from '../../src/examples/stress-document.js';
+import {createSpatialIndex} from '../../src/model/spatial-index.js';
+import {nearbySnaps} from '../../src/editor/snapping.js';
+import {bounds} from '../../src/model/entity-geometry.js';
 if(!global.gc)throw Error('Kör minnesprovet med node --expose-gc tests/performance/memory.mjs.');
 const samples=[];
 async function sample(stage,snap=null){await new Promise(resolve=>setImmediate(resolve));global.gc();await new Promise(resolve=>setImmediate(resolve));global.gc();const m=process.memoryUsage();samples.push({stage,heapMiB:+(m.heapUsed/1048576).toFixed(1),rssMiB:+(m.rss/1048576).toFixed(1),...(snap?{cache:snap.cacheStats()}:{})});}

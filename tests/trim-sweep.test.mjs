@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { beginTrimSweep, moveTrimSweep, trimSweepChange } from '../src/trim-sweep.js';
-import { trimSweepCrossings } from '../src/trim-extend.js';
-import { applyEditingChange } from '../src/editing-tools.js';
+import { beginTrimSweep, moveTrimSweep, trimSweepChange } from '../src/model/trim-sweep.js';
+import { trimSweepCrossings } from '../src/model/trim-extend.js';
+import { applyEditingChange } from '../src/tools/editing-tools.js';
 const p=(x,y)=>({x,y});
 const line=(id,a,b)=>({id,type:'line',layer:'0',points:[a,b]});
 const targets=[0,5,10].map((y,i)=>line(`t${i}`,p(0,y),p(10,y)));

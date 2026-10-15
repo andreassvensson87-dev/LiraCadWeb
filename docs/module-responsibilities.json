@@ -1,0 +1,606 @@
+{
+  "app.js": {
+    "layer": "app",
+    "responsibility": "Startar applikationen."
+  },
+  "app/block-controller.js": {
+    "layer": "app",
+    "responsibility": "Samordnar blocksession, parentlagring och återföring."
+  },
+  "app/document-workflow.js": {
+    "layer": "app",
+    "responsibility": "Samordnar import/export och skyddar pågående redigering."
+  },
+  "app/import-controller.js": {
+    "layer": "app",
+    "responsibility": "Filactions och insamling av importdiagnostik."
+  },
+  "app/project-controller.js": {
+    "layer": "app",
+    "responsibility": "Projektbyten och aktivt projekts editor- och kamerakontext."
+  },
+  "app/reference-controller.js": {
+    "layer": "app",
+    "responsibility": "Referensactions och skydd mot inaktuella asynkrona läsresultat."
+  },
+  "app/save-controller.js": {
+    "layer": "app",
+    "responsibility": "Samordnar journal och autosparning per ursprungsprojekt."
+  },
+  "app/viewport-controller.js": {
+    "layer": "app",
+    "responsibility": "Scenram, renderingsscheduling, canvasstorlek och fit."
+  },
+  "cad-application.js": {
+    "layer": "app",
+    "responsibility": "Kompositionsrot: skapar instanser och kopplar beroenden och effekter."
+  },
+  "commands/command-catalog.js": {
+    "layer": "commands",
+    "responsibility": "Kommandoidentifierare, alias och metadata."
+  },
+  "commands/command-prompts.js": {
+    "layer": "commands",
+    "responsibility": "DOM-fria prompttexter för verktygsfaser."
+  },
+  "core.js": {
+    "layer": "app",
+    "responsibility": "Kompatibilitetsfasad för äldre externa anrop."
+  },
+  "editor/active-document.js": {
+    "layer": "editor",
+    "responsibility": "En enda aktiv session; dokument och historik läses via sessionen."
+  },
+  "editor/block-edit-session.js": {
+    "layer": "editor",
+    "responsibility": "Isolerad blocksession och validerad återföring till huvuddokumentet."
+  },
+  "editor/command-controller.js": {
+    "layer": "editor",
+    "responsibility": "Tolkar kommandon och styr verktygens livscykel."
+  },
+  "editor/creation-settings.js": {
+    "layer": "editor",
+    "responsibility": "Äger separata skapandeinställningar för modell och papper."
+  },
+  "editor/cursor-controller.js": {
+    "layer": "editor",
+    "responsibility": "Samordnar cursor, snappning, polarstyrning och tracking."
+  },
+  "editor/document-context.js": {
+    "layer": "editor",
+    "responsibility": "Delade regler för aktiv ritmiljö, synlighet och redigerbarhet."
+  },
+  "editor/document-editor.js": {
+    "layer": "editor",
+    "responsibility": "Gemensam redigeringsingång och notifiering efter godkännande."
+  },
+  "editor/editor-actions.js": {
+    "layer": "editor",
+    "responsibility": "Ångra, vyändring, zoom, modifierare och snappningslägen."
+  },
+  "editor/editor-state.js": {
+    "layer": "editor",
+    "responsibility": "Äger tillfälligt interaktionstillstånd."
+  },
+  "editor/editor.js": {
+    "layer": "editor",
+    "responsibility": "Samordnar verktygsprotokollet med isolerad kontext."
+  },
+  "editor/entity-edit-controller.js": {
+    "layer": "editor",
+    "responsibility": "Äger objektändringar, skalvariantredigering och återställning av layoutvyer."
+  },
+  "editor/inspector-actions.js": {
+    "layer": "editor",
+    "responsibility": "Äger lager-, layout- och blockregler bakom inspektorns actions."
+  },
+  "editor/layout-controller.js": {
+    "layer": "editor",
+    "responsibility": "Styr ritmiljö, viewportinträde och layoutskapande."
+  },
+  "editor/local-snapping.js": {
+    "layer": "editor",
+    "responsibility": "Bygger begränsat snapindex för lokal interaktion."
+  },
+  "editor/navigation.js": {
+    "layer": "editor",
+    "responsibility": "Tolkar normaliserad hjul- och kommandotangentdata."
+  },
+  "editor/pointer-controller.js": {
+    "layer": "editor",
+    "responsibility": "CAD-gester, grepp, markering, navigation och dubbelklicksavsikter."
+  },
+  "editor/property-controller.js": {
+    "layer": "editor",
+    "responsibility": "Styr aktivt lager och egenskaper för markering eller nya objekt."
+  },
+  "editor/selection-controller.js": {
+    "layer": "editor",
+    "responsibility": "Äger härledd interaktionsgeometri samt markerings- och snapindex."
+  },
+  "editor/selection-gesture.js": {
+    "layer": "editor",
+    "responsibility": "Tillståndsmaskin för klick- och fönstermarkering."
+  },
+  "editor/snapping.js": {
+    "layer": "editor",
+    "responsibility": "Beräknar och prioriterar geometriska snappunkter."
+  },
+  "editor/text-edit-controller.js": {
+    "layer": "editor",
+    "responsibility": "Styr text-/attributredigering och kopplar textytans adapter."
+  },
+  "editor/text-edit-session.js": {
+    "layer": "editor",
+    "responsibility": "Isolerat textutkast och dess avslut."
+  },
+  "editor/tool-context.js": {
+    "layer": "editor",
+    "responsibility": "Bygger verktygskontext och applicerar verktygsresultat via editorn."
+  },
+  "editor/tool-registry.js": {
+    "layer": "editor",
+    "responsibility": "Registrerar varje interaktivt kommando hos en verktygsägare."
+  },
+  "editor/tracking.js": {
+    "layer": "editor",
+    "responsibility": "Äger tillfälliga referenspunkter för tracking."
+  },
+  "editor/wblock-controller.js": {
+    "layer": "editor",
+    "responsibility": "WBLOCK-val och validerade ändringar av original efter export."
+  },
+  "editor/workspace-controller.js": {
+    "layer": "editor",
+    "responsibility": "Stämmer av ritmiljö och markering efter dokumentändring."
+  },
+  "examples/demo-document.js": {
+    "layer": "examples",
+    "responsibility": "Genererar appens exempelritning."
+  },
+  "examples/stress-document.js": {
+    "layer": "examples",
+    "responsibility": "Genererar ritningar för belastningsprov."
+  },
+  "io/dxf-annotation.js": {
+    "layer": "io",
+    "responsibility": "Läser och serialiserar DXF-annotationers metadata."
+  },
+  "io/dxf-curves.js": {
+    "layer": "io",
+    "responsibility": "Konverterar spline-, ellips- och kurvdata från DXF."
+  },
+  "io/dxf-dimensions.js": {
+    "layer": "io",
+    "responsibility": "Läser och skriver DXF-måttdata."
+  },
+  "io/dxf-export.js": {
+    "layer": "io",
+    "responsibility": "Konverterar CAD-modellen till DXF."
+  },
+  "io/dxf-hatch.js": {
+    "layer": "io",
+    "responsibility": "Konverterar DXF-skraffering och dess slingor."
+  },
+  "io/dxf-import.js": {
+    "layer": "io",
+    "responsibility": "Konverterar DXF-data till validerad CAD-modell."
+  },
+  "io/dxf-layout.js": {
+    "layer": "io",
+    "responsibility": "Serialiserar DXF-layout- och viewportdata."
+  },
+  "io/dxf-mleader.js": {
+    "layer": "io",
+    "responsibility": "Konverterar DXF multileader-geometri."
+  },
+  "io/dxf-text.js": {
+    "layer": "io",
+    "responsibility": "Tolkar CAD-fontnamn och MTEXT-kontrollkoder."
+  },
+  "io/file-import.js": {
+    "layer": "io",
+    "responsibility": "Läser projektfiler eller startar formatworker och validerar resultat."
+  },
+  "io/file-launch.js": {
+    "layer": "io",
+    "responsibility": "Köar filöppning och binder operativsystemets filstart."
+  },
+  "io/import-package.js": {
+    "layer": "io",
+    "responsibility": "Serialiserar importdiagnostik till ett rapportpaket."
+  },
+  "io/reference-files.js": {
+    "layer": "io",
+    "responsibility": "Matchar och läser referensfiler utan att publicera ändringar."
+  },
+  "io/wblock.js": {
+    "layer": "io",
+    "responsibility": "DXF-adapter för det extraherade WBLOCK-dokumentet."
+  },
+  "model/annotation-context.js": {
+    "layer": "model",
+    "responsibility": "Härleder importerade annotationsrepresentationer och validerar dem."
+  },
+  "model/annotation-edit.js": {
+    "layer": "model",
+    "responsibility": "Översätter skalvariantens redigering till sparad modell."
+  },
+  "model/attributes.js": {
+    "layer": "model",
+    "responsibility": "Attributschema, alternativ, datum och sortering."
+  },
+  "model/blocks.js": {
+    "layer": "model",
+    "responsibility": "Blockdefinitioner, instanser, attribut och härledd blockgeometri."
+  },
+  "model/camera.js": {
+    "layer": "model",
+    "responsibility": "Omvandling mellan världskoordinater och skärmpunkter."
+  },
+  "model/catalog-placement.js": {
+    "layer": "model",
+    "responsibility": "Beräknar insättning och ankarpunkt för katalogblock."
+  },
+  "model/dimensions.js": {
+    "layer": "model",
+    "responsibility": "Måttvärden, måttkedjor och måttens grafik."
+  },
+  "model/document-session.js": {
+    "layer": "model",
+    "responsibility": "Äger godkänt dokument och atomiska, validerade historikändringar."
+  },
+  "model/document-snapshot.js": {
+    "layer": "model",
+    "responsibility": "Isolerar och förseglar godkända dokumentsnapshots."
+  },
+  "model/document.js": {
+    "layer": "model",
+    "responsibility": "Validerar ritningens schema och modellinvarianter."
+  },
+  "model/dxf-colors.js": {
+    "layer": "model",
+    "responsibility": "Gemensam ACI-färgpalett."
+  },
+  "model/editing.js": {
+    "layer": "model",
+    "responsibility": "Geometriska operationer för sammanfogning, hörn och polylinjer."
+  },
+  "model/entity-geometry.js": {
+    "layer": "model",
+    "responsibility": "Härleder gränser, hit-avstånd och markeringsgeometri."
+  },
+  "model/entity-properties.js": {
+    "layer": "model",
+    "responsibility": "Validerar och applicerar geometriska egenskaper."
+  },
+  "model/entity-transform.js": {
+    "layer": "model",
+    "responsibility": "Transformerar modellgeometri utan att ändra källobjekt."
+  },
+  "model/font-catalog.js": {
+    "layer": "model",
+    "responsibility": "CAD-fontnamn och visningsfamiljer utan fontladdning."
+  },
+  "model/geometry.js": {
+    "layer": "model",
+    "responsibility": "Grundläggande punkt-, vektor- och skärningsberäkningar."
+  },
+  "model/grips.js": {
+    "layer": "model",
+    "responsibility": "Geometriska grepp, mål och härledd greppförflyttning."
+  },
+  "model/hatch-pattern.js": {
+    "layer": "model",
+    "responsibility": "Härleder skrafferingens linjesegment."
+  },
+  "model/history.js": {
+    "layer": "model",
+    "responsibility": "Äger undo/redo-stacken och historikposter."
+  },
+  "model/layout.js": {
+    "layer": "model",
+    "responsibility": "Pappers- och viewportgeometri samt kameraomvandling."
+  },
+  "model/linetypes.js": {
+    "layer": "model",
+    "responsibility": "Linjetyper och deras mönster."
+  },
+  "model/offset.js": {
+    "layer": "model",
+    "responsibility": "Parallellförskjutning av modellgeometri."
+  },
+  "model/parametric-blocks.js": {
+    "layer": "model",
+    "responsibility": "Parametervärden, constraints och utvärderad blockgeometri."
+  },
+  "model/plot-style.js": {
+    "layer": "model",
+    "responsibility": "Utskriftsfärger och linjetjocklekar."
+  },
+  "model/polyline.js": {
+    "layer": "model",
+    "responsibility": "Bågsegment och härledd polylinjegeometri."
+  },
+  "model/references.js": {
+    "layer": "model",
+    "responsibility": "Referensmodell, status, geometri, bindning och borttagning."
+  },
+  "model/spatial-index.js": {
+    "layer": "model",
+    "responsibility": "Geometriskt sökindex och områdesfrågor."
+  },
+  "model/steel-profile-data.js": {
+    "layer": "model",
+    "responsibility": "Källdata för stålprofilernas dimensioner."
+  },
+  "model/steel-profiles.js": {
+    "layer": "model",
+    "responsibility": "Genererar profildefinitioner från tabelldata."
+  },
+  "model/stretch.js": {
+    "layer": "model",
+    "responsibility": "Sträckrutor, mål och geometrisk sträckning."
+  },
+  "model/text-columns.js": {
+    "layer": "model",
+    "responsibility": "Kolumnschema och placering av textrader."
+  },
+  "model/text-metrics.js": {
+    "layer": "model",
+    "responsibility": "Injicerad textmätning och deterministisk reservmätning."
+  },
+  "model/text.js": {
+    "layer": "model",
+    "responsibility": "Textlayout, justering och textegenskaper med injicerade mått."
+  },
+  "model/trim-extend.js": {
+    "layer": "model",
+    "responsibility": "Klipper och förlänger geometri mot gränser."
+  },
+  "model/trim-sweep.js": {
+    "layer": "model",
+    "responsibility": "Beräknar och samlar geometriska ändringar under trimsvep."
+  },
+  "model/values.js": {
+    "layer": "model",
+    "responsibility": "Kopiering och identifierare för modellvärden."
+  },
+  "model/view-geometry.js": {
+    "layer": "model",
+    "responsibility": "Rutnätsavstånd och viewportklipp i skärmkoordinater."
+  },
+  "model/wblock-document.js": {
+    "layer": "model",
+    "responsibility": "Extraherar ett oberoende ritningsdokument för WBLOCK."
+  },
+  "rendering/block-parameter-overlay.js": {
+    "layer": "rendering",
+    "responsibility": "Målar stretchparameterns tillfälliga overlay."
+  },
+  "rendering/cad-fonts.js": {
+    "layer": "rendering",
+    "responsibility": "Laddar browserfont och tillhandahåller inbäddad SVG-font."
+  },
+  "rendering/canvas-text-metrics.js": {
+    "layer": "rendering",
+    "responsibility": "Installerar canvasbaserad textmätning i värdplattformen."
+  },
+  "rendering/entity-renderer.js": {
+    "layer": "rendering",
+    "responsibility": "Målar ett modellobjekts härledda geometri till canvas."
+  },
+  "rendering/plot.js": {
+    "layer": "rendering",
+    "responsibility": "Serialiserar ritningens pappersrepresentation till SVG."
+  },
+  "rendering/scene-renderer.js": {
+    "layer": "rendering",
+    "responsibility": "Målar en läsbar scenram och klippta modellvyer."
+  },
+  "storage/document-journal.js": {
+    "layer": "storage",
+    "responsibility": "Beräknar och applicerar seriella dokumentpatchar."
+  },
+  "storage/indexeddb-project-store.js": {
+    "layer": "storage",
+    "responsibility": "IndexedDB-transaktioner och lagringsposter."
+  },
+  "storage/project-storage.js": {
+    "layer": "storage",
+    "responsibility": "Autosparning, återställning, journal och migrering."
+  },
+  "storage/project-workspace.js": {
+    "layer": "storage",
+    "responsibility": "Äger öppna/stängda projekt, sessioner och återöppningsmanifest."
+  },
+  "tools/annotation-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för annotation-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/block-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för block-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/corner-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för corner-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/dimension-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för dimension-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/drawing-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för drawing-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/editing-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för editing-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/stretch-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för stretch-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/structure-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för structure-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/transform-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för transform-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/utility-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för utility-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/vertex-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för vertex-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/viewport-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för viewport-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "tools/wblock-tools.js": {
+    "layer": "tools",
+    "responsibility": "Tillstånd, händelser, preview och deklarativa resultat för wblock-verktyg; inga DOM- eller dokumenteffekter."
+  },
+  "ui/appearance-inspector.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar utseendeegenskaper."
+  },
+  "ui/attribute-inspector.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar attributfält och attributdefinitioner."
+  },
+  "ui/block-inspector.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar blockattribut och parametrar; äger fältfokus."
+  },
+  "ui/cad-shell.js": {
+    "layer": "ui",
+    "responsibility": "Installerar arbetsytans panel- och menybeteende."
+  },
+  "ui/command-completion.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar och navigerar kommandoförslag."
+  },
+  "ui/command-feedback.js": {
+    "layer": "ui",
+    "responsibility": "Visar verktygsprompt, kommandohjälp och markering."
+  },
+  "ui/command-input.js": {
+    "layer": "ui",
+    "responsibility": "Binder kommandoradens DOM-händelser."
+  },
+  "ui/cursor-feedback.js": {
+    "layer": "ui",
+    "responsibility": "Läser pekarposition och visar cursorfeedback."
+  },
+  "ui/detail-catalog.js": {
+    "layer": "ui",
+    "responsibility": "Katalogsökning, urval, favoriter och SVG-förhandsvisning."
+  },
+  "ui/entity-inspector.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar objektspecifika egenskapskontroller."
+  },
+  "ui/file-drop.js": {
+    "layer": "ui",
+    "responsibility": "Binder webbläsarens externa fildrop till filkön."
+  },
+  "ui/general-inspector.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar lager, färg och linjetyp."
+  },
+  "ui/import-dialog.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar importdiagnostik och rapportnedladdning."
+  },
+  "ui/input-controller.js": {
+    "layer": "ui",
+    "responsibility": "Binder DOM-händelser till CAD-gester och tangentbordsactions."
+  },
+  "ui/inspector-composition.js": {
+    "layer": "ui",
+    "responsibility": "Kopplar inspektorns delpaneler till injicerade redigeringsactions."
+  },
+  "ui/inspector-controller.js": {
+    "layer": "ui",
+    "responsibility": "Väljer panel och presenterar inspektorns aktuella kontext."
+  },
+  "ui/inspector-controls.js": {
+    "layer": "ui",
+    "responsibility": "Skapar och validerar inmatningskontroller."
+  },
+  "ui/layer-panel.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar lagertabell och anropar lageractions."
+  },
+  "ui/layout-inspector.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar layoutfält och anropar layoutactions."
+  },
+  "ui/project-tabs.js": {
+    "layer": "ui",
+    "responsibility": "Visar projektflikar och vidarebefordrar byten, stängning och återöppning."
+  },
+  "ui/pwa.js": {
+    "layer": "ui",
+    "responsibility": "Binder installation och service worker till webbplattformen."
+  },
+  "ui/reference-panel.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar referensernas status och actions."
+  },
+  "ui/ribbon.js": {
+    "layer": "ui",
+    "responsibility": "Bygger menyflikar, verktygsgrupper och tangentbordsnavigation."
+  },
+  "ui/settings-panel.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar inställningar och exempelgenerering."
+  },
+  "ui/space-tabs.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar modell-/layoutflikar och viewportstatus."
+  },
+  "ui/text-editor.js": {
+    "layer": "ui",
+    "responsibility": "DOM-adapter för textutkastets kontroller, popup och fokus."
+  },
+  "ui/toolbar-groups.js": {
+    "layer": "ui",
+    "responsibility": "Presentationens verktygsgrupper och rubriker."
+  },
+  "ui/toolbar-icons.js": {
+    "layer": "ui",
+    "responsibility": "SVG-symboler för verktygsmenyn."
+  },
+  "ui/update-ui.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar och samordnar användarens appuppdatering."
+  },
+  "ui/wblock-dialog.js": {
+    "layer": "ui",
+    "responsibility": "Presenterar exportval och hanterar dialogens inmatning."
+  },
+  "ui/workspace-bindings.js": {
+    "layer": "ui",
+    "responsibility": "Binder arbetsytans knappar och fliknavigation till actions."
+  },
+  "ui/workspace-view.js": {
+    "layer": "ui",
+    "responsibility": "Visar status, arbetsytans tomläge och logg; webbläsarens fil-/downloadadapter."
+  },
+  "workers/dwg-import-worker.js": {
+    "layer": "workers",
+    "responsibility": "Isolerad worker för DWG-runtime, DXF-konvertering och diagnostik."
+  },
+  "workers/dxf-import-worker.js": {
+    "layer": "workers",
+    "responsibility": "Isolerad worker för DXF-konvertering och resultatmeddelanden."
+  }
+}

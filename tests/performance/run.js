@@ -1,10 +1,10 @@
-import { stressDocument } from '../../src/stress-document.js';
-import { nearbySnaps } from '../../src/snapping.js';
-import {createLocalSnapIndex} from '../../src/local-snapping.js';
-import {createSpatialIndex} from '../../src/spatial-index.js';
-import {bounds} from '../../src/entity-geometry.js';
-import { createSceneRenderer } from '../../src/scene-renderer.js';
-import { IndexedDBProjectStore } from '../../src/indexeddb-project-store.js';
+import { stressDocument } from '../../src/examples/stress-document.js';
+import { nearbySnaps } from '../../src/editor/snapping.js';
+import {createLocalSnapIndex} from '../../src/editor/local-snapping.js';
+import {createSpatialIndex} from '../../src/model/spatial-index.js';
+import {bounds} from '../../src/model/entity-geometry.js';
+import { createSceneRenderer } from '../../src/rendering/scene-renderer.js';
+import { IndexedDBProjectStore } from '../../src/storage/indexeddb-project-store.js';
 const result = document.querySelector('#result'), button = document.querySelector('#run');
 const measure = (run, count = 30) => {
   const times = [];

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWblockDialog, saveWblockFile } from '../src/wblock-dialog.js';
+import { createWblockDialog, saveWblockFile } from '../src/ui/wblock-dialog.js';
 
 const file={name:'Mall.dxf',text:'DXF content',type:'application/dxf'};
 test('WBLOCK saves to the chosen file and closes it; cancellation and write failures do not download a fallback',async()=>{

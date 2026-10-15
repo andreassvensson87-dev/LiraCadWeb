@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ProjectWorkspace } from '../src/project-workspace.js';
-import { ProjectStorage } from '../src/project-storage.js';
-import { demoDocument } from '../src/demo-document.js';
+import { ProjectWorkspace } from '../src/storage/project-workspace.js';
+import { ProjectStorage } from '../src/storage/project-storage.js';
+import { demoDocument } from '../src/examples/demo-document.js';
 
 function harness() {
   const values = new Map(), records = new Map(), errors = [];

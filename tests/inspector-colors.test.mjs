@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createInspectorControls } from "../src/inspector-controls.js";
-import { importDXF } from "../src/dxf-import.js";
+import { createInspectorControls } from "../src/ui/inspector-controls.js";
+import { importDXF } from "../src/io/dxf-import.js";
 
 class Element {
   children = [];

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mtextContent, textChunks } from "../src/text.js";
+import { mtextContent, textChunks } from "../src/model/text.js";
 import { bounds, toDXF, demoDocument, hitDistance } from "../src/core.js";
 test("multiline bounds and hit testing include lower lines", () => {
   const e = {

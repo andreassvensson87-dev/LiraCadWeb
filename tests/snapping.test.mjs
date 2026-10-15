@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSnapIndex, nearbySnaps, resolveSnap } from "../src/snapping.js";
+import { createSnapIndex, nearbySnaps, resolveSnap } from "../src/editor/snapping.js";
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 test("original entity endpoints remain eligible for all transform base and target points", () => {
   const index = createSnapIndex([

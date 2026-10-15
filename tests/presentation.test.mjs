@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createEntityRenderer } from "../src/entity-renderer.js";
-import { commandPrompt } from "../src/command-prompts.js";
-import { createInspectorControls } from "../src/inspector-controls.js";
+import { createEntityRenderer } from "../src/rendering/entity-renderer.js";
+import { commandPrompt } from "../src/commands/command-prompts.js";
+import { createInspectorControls } from "../src/ui/inspector-controls.js";
 
 test("entity renderer uses current camera and preserves arc orientation", () => {
   let camera = { scale: 2 };

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ProjectStorage } from '../src/project-storage.js';
-import { IndexedDBProjectStore } from '../src/indexeddb-project-store.js';
-import { demoDocument } from '../src/demo-document.js';
-import { validDocument } from '../src/document.js';
+import { ProjectStorage } from '../src/storage/project-storage.js';
+import { IndexedDBProjectStore } from '../src/storage/indexeddb-project-store.js';
+import { demoDocument } from '../src/examples/demo-document.js';
+import { validDocument } from '../src/model/document.js';
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
 function fixture() {

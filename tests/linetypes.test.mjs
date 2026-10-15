@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { linePattern, resolvedLineType } from "../src/linetypes.js";
+import { linePattern, resolvedLineType } from "../src/model/linetypes.js";
 import { toDXF, validDocument } from "../src/core.js";
-import { layoutSVG } from "../src/plot.js";
-import { polylineParts } from "../src/polyline.js";
+import { layoutSVG } from "../src/rendering/plot.js";
+import { polylineParts } from "../src/model/polyline.js";
 test("line types inherit layers and preserve explicit overrides through geometry and export", () => {
   const layer = { id: "0", name: "0", color: "#ffffff", lineType: "DASHED" };
   const e = {

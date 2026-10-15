@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Editor } from "../src/editor.js";
-import { transformTools, applyTransformChange } from "../src/transform-tools.js";
-import { drawingTools } from "../src/drawing-tools.js";
-import { History } from "../src/history.js";
-import { createBlock, blockParts } from "../src/blocks.js";
-import { dimensionChain, dimensionParts } from "../src/dimensions.js";
+import { Editor } from "../src/editor/editor.js";
+import { transformTools, applyTransformChange } from "../src/tools/transform-tools.js";
+import { drawingTools } from "../src/tools/drawing-tools.js";
+import { History } from "../src/model/history.js";
+import { createBlock, blockParts } from "../src/model/blocks.js";
+import { dimensionChain, dimensionParts } from "../src/model/dimensions.js";
 import { validDocument } from "../src/core.js";
 
 const line = (id, layer = "walls") => ({

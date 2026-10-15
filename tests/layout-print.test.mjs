@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {recoverEmptyViewports,viewportHasGeometry} from '../src/layout.js';
-import {layoutSVG} from '../src/plot.js';
-import {toDXF} from '../src/dxf-export.js';
-import {importDXF} from '../src/dxf-import.js';
-import {createEntityRenderer} from '../src/entity-renderer.js';
+import {recoverEmptyViewports,viewportHasGeometry} from '../src/model/layout.js';
+import {layoutSVG} from '../src/rendering/plot.js';
+import {toDXF} from '../src/io/dxf-export.js';
+import {importDXF} from '../src/io/dxf-import.js';
+import {createEntityRenderer} from '../src/rendering/entity-renderer.js';
 const line={id:'line',type:'line',layer:'0',points:[{x:0,y:0},{x:10000,y:2000}]};
 const viewport=(id,scale,center)=>({id,type:'viewport',layer:'vp',space:'paper',points:[{x:0,y:0},{x:100,y:100}],viewScale:scale,viewCenter:center,locked:true,viewRotation:Math.PI/2});
 const layers=[{id:'0',name:'0',color:'#ff0000',lineType:'CONTINUOUS',lineWeight:.5},{id:'vp',name:'Viewports',color:'#ffffff',lineType:'CONTINUOUS',plot:false}];

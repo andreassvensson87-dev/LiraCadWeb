@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { trimExtend } from "../src/trim-extend.js";
+import { trimExtend } from "../src/model/trim-extend.js";
 const p = (x, y) => ({ x, y }),
   line = (id, a, b) => ({ id, type: "line", layer: "0", points: [a, b] });
 const target = line("t", p(0, 0), p(10, 0));
@@ -142,8 +142,8 @@ test("circle requires two distinct finite intersections and uses neighboring cut
   near(arc.start, Math.PI / 2); near(arc.sweep, Math.PI * 1.5);
 });
 
-import { polylineParts } from "../src/polyline.js";
-import { polar } from "../src/geometry.js";
+import { polylineParts } from "../src/model/polyline.js";
+import { polar } from "../src/model/geometry.js";
 const curvedPath = sign => ({ id: "poly", type: "polyline", points: [p(10, 0), p(0, sign * 10)], bulges: [sign * Math.tan(Math.PI / 8)] });
 test("curved polyline trim retains exact circular geometry in both directions", () => {
   for (const sign of [1, -1]) {
@@ -193,10 +193,10 @@ test("straight endpoint extension keeps preceding curve intact", () => {
   assert.deepEqual(result.bulges, poly.bulges); assert.deepEqual(result.points.at(-1), p(-15, 10));
 });
 
-import { demoDocument } from "../src/demo-document.js";
-import { validDocument } from "../src/document.js";
-import { toDXF } from "../src/dxf-export.js";
-import { importDXF } from "../src/dxf-import.js";
+import { demoDocument } from "../src/examples/demo-document.js";
+import { validDocument } from "../src/model/document.js";
+import { toDXF } from "../src/io/dxf-export.js";
+import { importDXF } from "../src/io/dxf-import.js";
 test("trimmed circle and curved polyline remain valid editable geometry after DXF round trip", () => {
   const doc = demoDocument(), cut = line("cut", p(5, -20), p(5, 20));
   const circle = { id: "circle", type: "circle", center: p(0, 0), radius: 10 };

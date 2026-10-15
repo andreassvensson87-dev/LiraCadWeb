@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BlockEditSession } from "../src/block-edit-session.js";
-import { DocumentSession } from "../src/document-session.js";
-import { createBlock } from "../src/blocks.js";
-import { validDocument } from "../src/document.js";
+import { BlockEditSession } from "../src/editor/block-edit-session.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { createBlock } from "../src/model/blocks.js";
+import { validDocument } from "../src/model/document.js";
 
 function fixture(options) {
   const block = createBlock([{ id: "line", type: "line", layer: "0", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }] }], "Test", { x: 0, y: 0 }, "0");

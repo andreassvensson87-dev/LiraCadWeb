@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Editor } from "../src/editor.js";
-import { blockTools } from "../src/block-tools.js";
-import { viewportTools } from "../src/viewport-tools.js";
-import { DocumentSession } from "../src/document-session.js";
-import { applyEditingChange } from "../src/editing-tools.js";
-import { blockTemplates, createBlock } from "../src/blocks.js";
+import { Editor } from "../src/editor/editor.js";
+import { blockTools } from "../src/tools/block-tools.js";
+import { viewportTools } from "../src/tools/viewport-tools.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { applyEditingChange } from "../src/tools/editing-tools.js";
+import { blockTemplates, createBlock } from "../src/model/blocks.js";
 
 const p = (x, y) => ({ x, y });
 const line = { id: "line", type: "line", layer: "0", points: [p(0, 0), p(10, 0)], color: "#123456", lineType: "DASHED" };

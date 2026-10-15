@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createDocumentPatch,applyDocumentPatch} from '../src/document-journal.js';
+import {createDocumentPatch,applyDocumentPatch} from '../src/storage/document-journal.js';
 const entity=id=>({id,type:'line',layer:'0',points:[{x:0,y:0},{x:100,y:0}]});
 const doc=entities=>({version:1,name:'Ritning',layers:[{id:'0',name:'0',color:'#ffffff'}],entities});
 const roundTrip=(before,after)=>{

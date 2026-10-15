@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSpatialIndex } from '../src/spatial-index.js';
-import { bounds } from '../src/entity-geometry.js';
-import { stressDocument } from '../src/stress-document.js';
-import { createSnapIndex, appendSnapIndex, nearbySnaps } from '../src/snapping.js';
+import { createSpatialIndex } from '../src/model/spatial-index.js';
+import { bounds } from '../src/model/entity-geometry.js';
+import { stressDocument } from '../src/examples/stress-document.js';
+import { createSnapIndex, appendSnapIndex, nearbySnaps } from '../src/editor/snapping.js';
 test('spatial queries agree with exhaustive bounds checks and retain source order', async () => {
   const doc = await stressDocument(1000), before=structuredClone(doc);
   const entities=[...doc.entities,{id:'long',type:'line',points:[{x:-1e6,y:-1e6},{x:1e6,y:1e6}]}];
@@ -59,7 +59,7 @@ test('persistent replacement, deletion, reordering and undo match complete scene
   const initial=(await stressDocument(1000)).entities;
   let entities=initial,index=createSpatialIndex(entities,bounds),snap=createSnapIndex(entities);
   const old=index,oldSnap=snap;
-  const {updateSnapIndex}=await import('../src/snapping.js');
+  const {updateSnapIndex}=await import('../src/editor/snapping.js');
   const changed=structuredClone(entities[0]);changed.points=changed.points.map(p=>({x:p.x+2000,y:p.y+1000}));
   for(const next of [
     [changed,...entities.slice(1)],

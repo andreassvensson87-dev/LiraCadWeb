@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Editor } from "../src/editor.js";
-import { drawingTools } from "../src/drawing-tools.js";
-import { History } from "../src/history.js";
+import { Editor } from "../src/editor/editor.js";
+import { drawingTools } from "../src/tools/drawing-tools.js";
+import { History } from "../src/model/history.js";
 function setup() {
   const changes = [],
     messages = [];

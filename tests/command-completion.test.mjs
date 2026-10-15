@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { installCommandInput } from "../src/command-input.js";
-import { commandSuggestions } from "../src/command-completion.js";
+import { installCommandInput } from "../src/ui/command-input.js";
+import { commandSuggestions } from "../src/ui/command-completion.js";
 
 function fixture() {
   const element = () => ({

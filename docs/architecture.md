@@ -6,43 +6,30 @@ Den här uppdelningen bevarar befintliga filformat och verktygsbeteenden.
 
 ## Ansvar och beroenden
 
-| Område                | Moduler                                                                                                                                                                                                                                                                                   | Ansvar                                                                                                                                                  |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Matematik             | `geometry.js`                                                                                                                                                                                                                                                                             | Koordinatinmatning, vektorer, bågar, snitt och toleranser. Inga importer eller beroenden på dokument/UI.                                                |
-| Värden                | `values.js`                                                                                                                                                                                                                                                                               | Kopiering och unika identiteter; inget globalt apptillstånd.                                                                                            |
-| Objekt                | `entity-transform.js`, `polyline.js`, `blocks.js`, `dimensions.js`, `text.js`                                                                                                                                                                                                             | Objekttransformationer, blockdefinitioner, bågsegment och mått.                                                                                         |
-| Härledd geometri      | `entity-geometry.js`, `spatial-index.js`                                                                                                                                                                                                                                                  | Gränser, markering, hit-test, ritpunkter, snappunkter och oföränderligt områdesindex.                                                                   |
-| Redigering            | `editing.js`, `offset.js`, `trim-extend.js`, `grips.js`                                                                                                                                                                                                                                   | Geometrioperationer som returnerar resultat utan att ändra dokumentet.                                                                                  |
-| Dokument              | `document.js`                                                                                                                                                                                                                                                                             | Validering av projekt, lager, objekt, block och layouter.                                                                                               |
-| Transaktioner         | `document-session.js`, `document-snapshot.js`, `block-edit-session.js`, `text-edit-session.js`, `history.js`                                                                                                                                                                              | Godkänt dokument, isolerade utkast/ögonblicksbilder, validering och undo/redo.                                                                          |
-| Kommandon             | `editor.js`, `drawing-tools.js`, `transform-tools.js`, `editing-tools.js`, `corner-tools.js`, `vertex-tools.js`, `structure-tools.js`, `dimension-tools.js`, `block-tools.js`, `viewport-tools.js`, `annotation-tools.js`, `utility-tools.js`, `command-catalog.js`, `command-prompts.js` | Verktygsprotokoll, faser, metadata, alias, inmatning och förhandsvisningar.                                                                             |
-| Interaktion           | `snapping.js`, `local-snapping.js`, `tracking.js`, `navigation.js`                                                                                                                                                                                                                        | Exakt snappning, lokal och begränsad geometri-cache, referenspunkter och regler för mus/tangentbord.                                                    |
-| Presentation          | `scene-renderer.js`, `entity-renderer.js`, `text-editor.js`, `inspector-controls.js`, `general-inspector.js`, `appearance-inspector.js`, `attribute-inspector.js`, `entity-inspector.js`, `layout-inspector.js`, `block-inspector.js`, `layer-panel.js`, `toolbar-icons.js`               | Scen- och objektmålning, inspector för egenskaper/utseende/attribut/objekt/layout/block, lagerpanel och ikoner.                                         |
-| Filflöde              | `document-workflow.js`                                                                                                                                                                                                                                                                    | Bekräftar text/block, skyddar ändringar under asynkron import och samordnar dokumentbyte/sparande/export med injicerade effekter.                       |
-| Filformat             | `file-import.js`, `dxf-import.js`, `dxf-export.js`, `dxf-dimensions.js`, `dxf-layout.js`, import-workers                                                                                                                                                                                  | Filinläsning, formatmappning och serialisering. Import ersätter aldrig själv aktivt dokument.                                                           |
-| Lagring               | `project-storage.js`, `document-journal.js`, `indexeddb-project-store.js`                                                                                                                                                                                                                 | Asynkron återläsning, migrering, debounce, sparordning, återställningslogg och IndexedDB-transaktioner.                                                 |
-| Projektflikar         | `project-workspace.js`                                                                                                                                                                                                                                                                    | Separata dokumentsessioner, flikordning, aktivt projekt, stängning och återöppning utan att radera sparade projekt.                                     |
-| Start och kopplingar  | `app.js`, `cad-application.js`                                                                                                                                                                                                                                                            | Startar appen, skapar instanser och kopplar controllerer och effekter för aktuell arbetsyta.                                                            |
-| Editorstyrning        | `editor-state.js`, `command-controller.js`, `document-editor.js`, `selection-controller.js`, `cursor-controller.js`, `tool-registry.js`                                                                                                                                                   | Tillfälligt tillstånd, kommandolivscykel, aktiv transaktionsingång, gemensamma rit-/snapindex och snappning/spårning utan DOM.                          |
-| Arbetsytecontrollerer | `project-controller.js`, `block-controller.js`, `layout-controller.js`, `viewport-controller.js`                                                                                                                                                                                          | Projekt- och blocksessioner, modell/papper, kamera, resize och omritning. Använder befintliga domänmoduler.                                             |
-| UI-skal               | `cad-shell.js`, `cad-shell.css`, `ribbon.js`, `project-tabs.js`, `inspector-controller.js`, `command-feedback.js`, `cursor-feedback.js`, `command-input.js`, `input-controller.js`                                                                                                        | Verktygs-/filflikar, inspektorns paneler, återkoppling och DOM-händelser. Anropar injicerade actions.                                                   |
-| Installation          | `pwa.js`, `update-ui.js`                                                                                                                                                                                                                                                                  | Installation och säker uppdatering efter accepterad dokumentlagring.                                                                                    |
-| Inställningar         | `settings-panel.js`                                                                                                                                                                                                                                                                       | Äger inställningsdialogen, status under generering och anropar injicerade navigerings- och dokumentflöden.                                              |
-| Exempel               | `demo-document.js`, `stress-document.js`                                                                                                                                                                                                                                                  | Skapar exempelritning och stora testdokument. Stresstest byggs i omgångar så att webbläsaren kan visa framsteg. Ingår inte i geometri eller validering. |
+| Lager | Ansvar | Tillåtna beroenden |
+| --- | --- | --- |
+| `model/` | Modellregler, geometri, godkänt dokument och historik. | Modell |
+| `commands/` | Kommandoidentifierare och DOM-fria prompttexter. | Kommandometadata |
+| `tools/` | Verktygsfaser, previews och deklarativa ändringar. | Modell och kommandometadata |
+| `editor/` | Interaktion, markering, aktiva sessioner och redigeringsactions. | Modell, verktyg och kommandometadata |
+| `rendering/` | Canvas/SVG, fontladdning och textmätning. | Modell och kommandometadata |
+| `ui/` | DOM, kontroller, presentation, fokus och browserhändelser. | Läser data; anropar injicerade actions och adaptrar |
+| `io/` | Filformat, filinläsning, serialisering och köer. | Modell |
+| `workers/` | Plattformens isolerade formatkonvertering. | IO och renderingsadaptrar |
+| `storage/` | Autosparning, journal, IndexedDB och projektmanifest. | Modell |
+| `app/` | Samordnar projekt, lagring, formatflöden och scenramar. | Kopplar lagrens uttryckliga API:er |
+| `examples/` | Exempel- och belastningsdata. | Modell |
 
-`core.js` är en kompatibilitetsfasad med återexporter för äldre anrop och tester.
-Ingen intern modul importerar den. Nya moduler importerar det ansvariga området
-direkt. De egna modulernas beroendegraf är acyklisk och kontrolleras av tester.
+`src/app.js` startar appen. `src/cad-application.js` är kompositionsroten. Den skapar
+instanser och kopplar beroenden/effekter; nya redigeringsregler och DOM-beteenden
+läggs hos respektive ägare. `src/core.js` finns som kompatibilitetsfasad och används
+inte internt. Modulerna bildar en acyklisk beroendegraf.
 
-Områdesindex byggs när dokumentet eller aktiv ritrymd ändras och återanvänds vid
-pekarrörelser. Snap har separata index för punkter och kanter; skärningar söker
-bara överlappande kantgränser. Renderingen söker synliga objekt i samma typ av
-index och behåller dokumentordningen. `scene-renderer.js` cachar modellvyns
-bakgrund, medan förhandsvisningar och snapmarkörer målas separat. Vid navigering
-i stora modellritningar återprojiceras den senaste exakta bilden tillfälligt;
-appskalet begär exakt omritning när rörelsen har stannat. Dokument, lager,
-markering, hover, kamera och canvasstorlek ingår i cachekontrollen. Paperspace
-ritas fortfarande direkt. Se [prestandaprovet](performance.md).
+Alla egna moduler har ett dokumenterat ansvar i
+[module-registret](module-responsibilities.json) och
+[filgenomgången](architecture-review.md). `tests/layer-boundaries.test.mjs`
+kontrollerar hela registret, samtliga importer, lagergränser och att modell,
+editor och verktyg saknar DOM, browserlagring, fontladdning och workers.
 
 ## Dokument och transaktioner
 
@@ -63,7 +50,7 @@ Nya objekt går genom `DocumentSession.append`, som validerar hela nästa
 dokument men delar oförändrade, rekursivt frysta objekt mellan ögonblicksbilder.
 Objekt från indata kopieras innan de accepteras. Varje dokument/historikpost får
 egna objektarrayer och kopierad metadata; verktygsutkast för vanlig redigering
-är fortsatt skrivbara kopior. `document-snapshot.js` äger denna delning. Tomma
+är fortsatt skrivbara kopior. `src/model/document-snapshot.js` äger denna delning. Tomma
 tillägg och avvisad validering bevarar redo och godkänt dokument.
 
 `DocumentSession.replaceEntities` tar en färdig objektlista för flytt, rotation,
@@ -82,7 +69,7 @@ tar bort och sätter in ändrade objekt i beständiga träd och behåller ritord
 Stora ändringar bygger ett nytt balanserat träd. Appens snap använder samma
 ritindex för att hitta objekt runt pekaren. Ett kompletterande objektträd täcker
 bågcentrum, blockinsättning och andra ankare utanför den synliga geometrin.
-`local-snapping.js` beräknar detaljer först vid lokal sökning och håller en LRU-cache
+`src/editor/local-snapping.js` beräknar detaljer först vid lokal sökning och håller en LRU-cache
 på högst 512 objekt och 8 192 punkter/kanter. Ett separat förberett sökfönster har
 samma gränser och återanvänds medan pekarens toleransområde ryms inom fönstret.
 Mycket breda sökningar kan använda större temporära data men behåller inget
@@ -92,7 +79,7 @@ Objektarrayer och rangtabeller uppdateras fortfarande över ritningen; kostnaden
 är linjär även vid en liten ändring. Ersättningar invaliderar den målade bakgrunden
 så att borttagna objekt inte ligger kvar i bilden.
 
-`document-editor.js` läser den aktiva dokumentsessionen vid varje redigering.
+`src/editor/document-editor.js` läser den aktiva dokumentsessionen vid varje redigering.
 Den publicerar en ändringshändelse först efter godkänd validering; oförändrade
 eller avvisade ändringar ger ingen sådan händelse. Appens effektadapter uppdaterar
 sedan index, UI och autosparning. Transaktionscallbacks tar alltid utkastet som
@@ -179,70 +166,77 @@ med viewport kan inte roteras/speglas, även i preview. Escape/kommandobyte
 kastar ofärdiga förhandsvisningar. Snappning använder originalgeometri.
 
 Måttkommandona DIMLINEAR, DIMALIGNED, DIMANGULAR, DIMRADIUS, DIMDIAMETER och
-DIMCONTINUE ligger i `dimension-tools.js`. Verktygen tar skapandestandarder,
+DIMCONTINUE ligger i `src/tools/dimension-tools.js`. Verktygen tar skapandestandarder,
 valbara objekt och träffpunkt som kontext. Måttkedjor placeras i en transaktion;
 fortsättning ersätter måttet med bibehållet ID och en historikpost per ny punkt.
 Byt/Välj och relativa koordinater använder verktygets egna faser och baspunkt.
 Förval av cirkel/båge och måttkedja bevaras när kommandot startar. Misslyckad
 transaktion avancerar inte verktyget eller markeringen.
 
-BLOCK, INSERT och ATTDEF använder `block-tools.js`. Blockskapande ersätter
+BLOCK, INSERT och ATTDEF använder `src/tools/block-tools.js`. Blockskapande ersätter
 urvalet och registrerar definitionen i samma transaktion. Namnets unikhet
 kontrolleras även vid slutlig placering. Infogning slår upp aktuell definition
 via ID före preview/sparande; saknad definition behåller verktygsinmatningen.
 ATTDEF validerar texturval, tagg och enradig text före ersättning.
-MVIEW använder `viewport-tools.js`: appen väljer papperskontext, verktyget äger
+MVIEW använder `src/tools/viewport-tools.js`: appen väljer papperskontext, verktyget äger
 hörninmatning, preview och ett färdigt låst viewportobjekt.
 
 `TextEditSession` äger textutkastet och publicerar en ersättning eller ett nytt
-objekt genom en injicerad transaktion. `text-editor.js` äger popupens position,
+objekt genom en injicerad transaktion. `src/ui/text-editor.js` äger popupens position,
 stil, typsnitt och tangentbordshantering. Sparfel eller flerradiga attribut
 behåller utkastet öppet; kommandostart, byte av ritläge och blockavslut avbryts
 om texten inte kunde accepteras. Avbryt och tom text ger ingen historikpost.
 
-TEXT, LEADER och HATCH ligger i `annotation-tools.js`. TEXT avslutar kommandot
+TEXT, LEADER och HATCH ligger i `src/tools/annotation-tools.js`. TEXT avslutar kommandot
 och öppnar ett isolerat textutkast; själva texten sparas först i textsessionen.
 LEADER samlar tre punkter, fokuserar kommandoraden för text och sparar ett objekt.
 HATCH samlar minst tre hörn och avslutas med Enter/C. Skapandestandarder hämtas
 ur aktuell modell-/papperskontext och används även för hänvisningens preview.
 Sparfel behåller textfasen eller alla skrafferingshörn för ett nytt försök.
 
-DIST, PAN och ERASE ligger i `utility-tools.js`. DIST accepterar klickade,
+DIST, PAN och ERASE ligger i `src/tools/utility-tools.js`. DIST accepterar klickade,
 relativa och polära punkter och visar avstånd/ΔX/ΔY utan dokumenttransaktion.
 PAN äger kommandoläget och avslutningen; appens navigation äger musdrag och kamera.
 ERASE stödjer förval och kommando-först och tar bort hela urvalet i en transaktion.
 Alla interaktiva kommandon i katalogen har en unik verktygsägare, med undantag
 för BEDIT som öppnar en blocksession. Detta kontrolleras av arkitekturtesterna.
 
-## Presentation och fortsatt uppdelning
+## Presentation och editorkontext
 
-`scene-renderer.js` målar en synkron bildruta från injicerade dokument-, kamera-
-och interaktionsdata. Den äger sin tillfälliga kamerakontext för viewports och
-ändrar varken appens kamera eller dokumentet. Appen förbereder verktygs- och
-greppförhandsvisningar. Renderaren äger rutnät, synlighetsfiltrering, klippning,
-objektmålning och overlays för markering, grepp, spårning, snappning och markör.
-Den har inga DOM- eller lagringsberoenden. Zoomtext och renderingsschemaläggning
-ligger kvar i appskalet. `viewportClip` delas med interaktionens klippkontroll.
+`rendering/scene-renderer.js` målar en synkron scenram utan att ändra dokument
+eller appkamera. `app/viewport-controller.js` samlar previews och schemalägger
+målning/resize. Zoomstatus skickas till en UI-effekt. Klipp- och rutnätsberäkningar
+ligger i `model/view-geometry.js` så interaktion aldrig behöver importera renderaren.
 
-Layout- och blockpanelerna använder injicerade dokumentläsare och callbacks.
-Layoutfälten fångar ett ID och slår upp objektet i transaktionsutkastet, även om
-fältets callback kommer från en tidigare render. Formatändring och borttagning
-utför navigeringssteget först efter lyckad transaktion. Blockpanelerna visar
-utkastets namn/baspunkt och instansens attribut; sessionens spara/avbryt-livscykel
-ägs av `BlockEditSession`; appen återställer vy, fokus och markering.
+`editor/document-context.js` ger gemensamma regler för ritmiljö, synlighet,
+frysta lager, redigerbarhet och annotationens aktiva representation.
+`editor/selection-controller.js` äger det aktiva rit-/snapindexet; verktyg,
+hit-test och snappning använder samma härledda geometri. Preview sparas aldrig
+som godkänd modell.
 
-`app.js` är fortfarande integrationsmodulen för kamera, markering, fokusregler,
-och kopplingen till dokument-, block- och textsessioner.
-Inspectorfälten ligger i egna presentationsmoduler; appen väljer panel och
-hanterar skapandestandarder. Kommandonas inmatning, faser och preview går genom
-editorn; fokus och sessionöppning är injicerade effekter. Nya verktyg följer
-samma gränser och regressionstester. Modulerna ska inte få beroenden på appens
-globala tillstånd.
+`ui/input-controller.js` binder DOM och tangentbord.
+`editor/pointer-controller.js` äger CAD-gester, grepp och markering samt tar
+emot presentationseffekter som callbacks. `ui/space-tabs.js` presenterar
+modell/layout; `editor/layout-controller.js` styr deras beteende.
 
-Mät stora dokument före nytt rumsligt index, förändringsbaserad historik eller
-ny rendering. Återställningspunkter och lagring av historik är framtida
-lagringsarbete. Ingen av dessa omskrivningar krävs för att lägga till en
-avgränsad funktion i rätt modul.
+Inspektorns kontroller skickar egenskapspatchar eller avsikter till
+`editor/property-controller.js`, `editor/entity-edit-controller.js` och
+`editor/inspector-actions.js`. Lager-/layout-/blockregler och validerade
+transaktioner ligger där. UI får aldrig publicera ett dokument eller ändra
+historik. Text- och blockutkast har egna sessionslivscykler.
+
+`model/text.js` beräknar gemensam textlayout utan browserberoenden.
+`model/text-metrics.js` tar emot en explicit mätprovider.
+`rendering/canvas-text-metrics.js` och `rendering/cad-fonts.js` äger canvas och
+fontladdning. Samma provider används av rendering, markering och SVG-export;
+formatworkers installerar sin provider i den isolerade värdmiljön.
+
+`editor/active-document.js` läser dokument/historik från aktuell session via
+getters; projekt- och blockbyte kan inte lämna parallella gamla pekare.
+`editor/document-editor.js` skickar notifiering först efter godkänd ändring.
+Sparad viewportnavigation går genom `DocumentSession.updateViewportView`, som
+validerar en ny snapshot och begränsar ändringen till vyfält utan en geometrisk
+undo-post. Vanliga objekt-/egenskapsändringar går genom historiktransaktioner.
 
 ## Lokal autosparning
 
@@ -283,7 +277,7 @@ Sidstängning och dold sida tömmer väntande autosparning direkt. En redan öpp
 anslutning används synkront vid sidstängning för att inte förlora sista ändringen
 i en senare promise-fortsättning. Godkända ändringar har dessutom en synkron
 återställningslogg i localStorage, kopplad till databasens checkpoint.
-`document-journal.js` beräknar små poster för ändrade/raderade objekt, placering
+`src/storage/document-journal.js` beräknar små poster för ändrade/raderade objekt, placering
 i objektordningen och dokumentmetadata. Oförändrad geometri utelämnas; en längsta
 stigande följd minimerar flyttposter vid omordning. Ångra/Gör om behandlas som
 andra dokumentändringar. Äldre tilläggsloggar kan fortfarande återställas.
@@ -304,7 +298,7 @@ Toppraden visar sparstatus och ett förklarande fel vid misslyckande. Vid
 oläsbart utkast eller otillgänglig lagring kan fortsatt arbete sparas till fil.
 Se [lagringsprovet](storage.md) för genomförda kontroller.
 
-Filoperationer går genom `document-workflow.js`. Spara och export bekräftar
+Filoperationer går genom `src/app/document-workflow.js`. Spara och export bekräftar
 textutkast explicit; öppna/ersätta stoppas vid nekad text eller aktiv blocksession.
 En långsam import kontrollerar dokumentets identitet och nya pågående utkast
 innan den accepteras. Appen återställer modelläge och kamerakontext först efter
@@ -338,20 +332,20 @@ Markera/Flytta är tillgängliga oavsett kategori. Byte av verktygsflik ändrar
 bara vilka kontroller som visas, inte aktivt kommando eller urval.
 
 Öppna ritningar har en separat flikrad över hela fönstret. Modell/layout ligger
-kvar under respektive rityta. `project-tabs.js` bygger flikarna och rapporterar
-byte/stängning/återöppning; `project-controller.js` sparar kamerakontext och byter
+kvar under respektive rityta. `src/ui/project-tabs.js` bygger flikarna och rapporterar
+byte/stängning/återöppning; `src/app/project-controller.js` sparar kamerakontext och byter
 session; `ProjectWorkspace` äger sessionslistan och lagring. Stängning väntar på
 bekräftad sparning och sista fliken kan stängas till tomt startläge. Flikbyte
 behåller den öppna sessionens undo/redo; omladdning/återöppning skapar ny historik.
 
 Inspektorns högerlist väljer Egenskaper, Katalog och Referenser, och öppnar den
 befintliga lagereditorn. Utseende och objektspecifika sektioner delar samma
-kompakta etikett/värde-rader. `entity-properties.js` beskriver redigerbar
-linje-, cirkel-, båg- och textgeometri utan DOM; `entity-inspector.js` visar
+kompakta etikett/värde-rader. `src/model/entity-properties.js` beskriver redigerbar
+linje-, cirkel-, båg- och textgeometri utan DOM; `src/ui/entity-inspector.js` visar
 fälten och skickar ändringar genom editorn. Verktygsstandarder och utkast är
 separata från godkända modellobjekt.
 
 Beroendena är acykliska. Modell, verktyg och editorcontrollerer får inte importera
-UI-skalet eller browserlagring. `cad-application.js` innehåller fortfarande
-instanskopplingar och effektadaptrar för fil-/referensflöden, autosparning och
-annotationsprojektion. Dessa har inga parallella objektmodeller eller snapmotorer.
+UI-skalet eller browserlagring. `src/cad-application.js` innehåller fortfarande
+instanskopplingar och uttryckliga effekter. Fil-/referensflöden och autosparning
+ligger i egna appcontrollerer. Redigeringsreglerna ligger hos sina editorcontrollerer.

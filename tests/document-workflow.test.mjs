@@ -1,16 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDocumentWorkflow } from "../src/document-workflow.js";
-import { DocumentSession } from "../src/document-session.js";
-import { TextEditSession } from "../src/text-edit-session.js";
-import { ProjectStorage } from "../src/project-storage.js";
-import { Editor } from "../src/editor.js";
-import { transformTools, applyTransformChange } from "../src/transform-tools.js";
-import { applyEditingChange } from "../src/editing-tools.js";
-import { demoDocument } from "../src/demo-document.js";
-import { validDocument } from "../src/document.js";
-import { readDrawingFile } from "../src/file-import.js";
-import { importDXF, decodeDXF } from "../src/dxf-import.js";
+import { createDocumentWorkflow } from "../src/app/document-workflow.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { TextEditSession } from "../src/editor/text-edit-session.js";
+import { ProjectStorage } from "../src/storage/project-storage.js";
+import { Editor } from "../src/editor/editor.js";
+import { transformTools, applyTransformChange } from "../src/tools/transform-tools.js";
+import { applyEditingChange } from "../src/tools/editing-tools.js";
+import { demoDocument } from "../src/examples/demo-document.js";
+import { validDocument } from "../src/model/document.js";
+import { readDrawingFile } from "../src/io/file-import.js";
+import { importDXF, decodeDXF } from "../src/io/dxf-import.js";
 
 const project = (document, name = "Test.liracad") => ({ name, size: 100, text: async () => JSON.stringify(document) });
 function harness(options = {}) {

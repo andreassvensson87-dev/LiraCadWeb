@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createViewportController } from "../src/viewport-controller.js";
-import { createEditorState } from "../src/editor-state.js";
+import { createViewportController } from "../src/app/viewport-controller.js";
+import { createEditorState } from "../src/editor/editor-state.js";
 
 test("closing the final file does not paint a zero-sized hidden drawing surface", () => {
   const state = createEditorState();

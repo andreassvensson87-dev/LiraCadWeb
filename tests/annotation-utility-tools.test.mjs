@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Editor } from "../src/editor.js";
-import { annotationTools } from "../src/annotation-tools.js";
-import { utilityTools } from "../src/utility-tools.js";
-import { DocumentSession } from "../src/document-session.js";
-import { applyEditingChange } from "../src/editing-tools.js";
-import { TextEditSession } from "../src/text-edit-session.js";
+import { Editor } from "../src/editor/editor.js";
+import { annotationTools } from "../src/tools/annotation-tools.js";
+import { utilityTools } from "../src/tools/utility-tools.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { applyEditingChange } from "../src/tools/editing-tools.js";
+import { TextEditSession } from "../src/editor/text-edit-session.js";
 
 const p = (x, y) => ({ x, y });
 const line = { id: "line", type: "line", layer: "0", points: [p(0, 0), p(10, 0)] };

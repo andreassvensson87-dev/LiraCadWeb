@@ -1,7 +1,7 @@
-import { IndexedDBProjectStore } from '../../src/indexeddb-project-store.js';
-import { ProjectStorage } from '../../src/project-storage.js';
-import { demoDocument } from '../../src/demo-document.js';
-import { validDocument } from '../../src/document.js';
+import { IndexedDBProjectStore } from '../../src/storage/indexeddb-project-store.js';
+import { ProjectStorage } from '../../src/storage/project-storage.js';
+import { demoDocument } from '../../src/examples/demo-document.js';
+import { validDocument } from '../../src/model/document.js';
 const result=document.querySelector('#result'),button=document.querySelector('#run');
 const assert=(condition,message)=>{if(!condition)throw Error(message);};
 button.onclick=async()=>{

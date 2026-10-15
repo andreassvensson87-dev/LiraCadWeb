@@ -4,7 +4,7 @@ Source: [Tibnor construction tables 2023](https://www.tibnor.se/medias/konstrukt
 
 Source PDF SHA-256: `4977fea5282dbf5ed1e64fe8217be164a4cb46c26a40bdbaa1fe315570faa711`.
 
-`src/steel-profile-data.js` stores the nominal section dimensions in millimetres. For IPE/HEA/HEB/HEM, source columns are h, b, t, d, R. For UPE and U/UNP they are h, b, d, t, R1/Rk, R2/Rf. The source U series from U 65 to U 400 appears as UNP in the catalogue; special small U bars are excluded.
+`src/model/steel-profile-data.js` stores the nominal section dimensions in millimetres. For IPE/HEA/HEB/HEM, source columns are h, b, t, d, R. For UPE and U/UNP they are h, b, d, t, R1/Rk, R2/Rf. The source U series from U 65 to U 400 appears as UNP in the catalogue; special small U bars are excluded.
 
 Parallel flange profiles and root/tip fillets are closed polylines with exact circular bulges. UNP has tapered flange faces (8% through 300, 5% above 300); nominal flange thickness is measured at b/2 through 300, and at (b+d)/2 above 300. Slope convention: [ArcelorMittal 2024 sales programme](https://sections.arcelormittal.com/repository2/Sections/Sections_MB_ArcelorMittal_FR_EN_DE_V2024-1.pdf), UPN section diagram. Radii remain as given by Tibnor, including their stated fractional values.
 

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createLocalSnapIndex} from '../src/local-snapping.js';
-import {createSnapIndex,nearbySnaps,resolveSnap} from '../src/snapping.js';
-import {createSpatialIndex} from '../src/spatial-index.js';
-import {bounds} from '../src/entity-geometry.js';
-import {stressDocument} from '../src/stress-document.js';
+import {createLocalSnapIndex} from '../src/editor/local-snapping.js';
+import {createSnapIndex,nearbySnaps,resolveSnap} from '../src/editor/snapping.js';
+import {createSpatialIndex} from '../src/model/spatial-index.js';
+import {bounds} from '../src/model/entity-geometry.js';
+import {stressDocument} from '../src/examples/stress-document.js';
 const line=(id,a,b)=>({id,type:'line',points:[a,b]});
 const local=(entities,options={})=>createLocalSnapIndex(entities,{entityIndex:createSpatialIndex(entities,bounds),...options});
 

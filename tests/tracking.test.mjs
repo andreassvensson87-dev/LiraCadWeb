@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { TrackingReferences } from "../src/tracking.js";
+import { TrackingReferences } from "../src/editor/tracking.js";
 const p = { x: 10, y: 20 },
   q = { x: 40, y: 80 };
 test("a reference requires continuous hovering for 400 ms", () => {

@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { TextEditSession } from "../src/text-edit-session.js";
-import { createTextEditor } from "../src/text-editor.js";
-import { DocumentSession } from "../src/document-session.js";
-import { applyEditingChange } from "../src/editing-tools.js";
+import { TextEditSession } from "../src/editor/text-edit-session.js";
+import { createTextEditor } from "../src/ui/text-editor.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { applyEditingChange } from "../src/tools/editing-tools.js";
 
 const entity = { id: "text", type: "text", layer: "0", point: { x: 0, y: 0 }, height: 12, text: "Before" };
 function fixture(isNew = false) {

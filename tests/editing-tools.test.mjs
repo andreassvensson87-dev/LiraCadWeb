@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Editor } from "../src/editor.js";
-import { editingTools, applyEditingChange } from "../src/editing-tools.js";
-import { DocumentSession } from "../src/document-session.js";
-import { demoDocument } from "../src/demo-document.js";
+import { Editor } from "../src/editor/editor.js";
+import { editingTools, applyEditingChange } from "../src/tools/editing-tools.js";
+import { DocumentSession } from "../src/model/document-session.js";
+import { demoDocument } from "../src/examples/demo-document.js";
 const line = (id, a, b) => ({ id, layer: "walls", space: "model", type: "line", color: "#123456", lineType: "DASHED", points: [a, b] });
 const target = line("target", { x: 0, y: 0 }, { x: 10, y: 0 });
 const boundary = line("boundary", { x: 5, y: -10 }, { x: 5, y: 10 });
