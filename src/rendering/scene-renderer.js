@@ -26,6 +26,43 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
     return viewport ? viewportClip(viewport, frame.paperCamera, frame.width, frame.height) : null;
   };
   const { path, drawEntity } = createEntityRenderer({ ctx, screen, getCamera: () => camera, layerOf, foregroundColor: () => paintingPaper ? "#000000" : "#ffffff",paperScale:()=>paintingPaper?(frame.paperCamera||frame.camera).scale:null,monochrome:()=>paintingPaper && !!frame.doc.layouts.find(l=>l.id===frame.activeSpace)?.monochrome });
+  function paintGrid() {
+    const { width, height, dpr, activeSpace } = frame;
+    // Keep the existing logical grid/snap step. Subdivisions are display only.
+    const spacing = gridSpacing(camera.scale) / 5;
+    const tl = world({ x: 0, y: 0 }), br = world({ x: width, y: height });
+    const align = value => (Math.round(value * dpr - 0.5) + 0.5) / dpr;
+    const model = activeSpace === "model";
+    ctx.save();
+    ctx.lineWidth = 1 / dpr;
+    ctx.setLineDash([]);
+    for (const major of [false, true]) {
+      ctx.strokeStyle = model
+        ? major ? "#30474f" : "#23383e"
+        : major ? "#aab5bc" : "#c7cfd4";
+      ctx.beginPath();
+      const firstX = Math.ceil(tl.x / spacing), firstY = Math.ceil(br.y / spacing);
+      // Bound iteration by screen size, including drawings far from the origin.
+      const columns = Math.ceil(width / (spacing * camera.scale)) + 1;
+      const rows = Math.ceil(height / (spacing * camera.scale)) + 1;
+      for (let offset = 0; offset < columns; offset++) {
+        const index = firstX + offset;
+        if ((index % 5 === 0) !== major) continue;
+        const x = align(screen({ x: index * spacing, y: 0 }).x);
+        if (x < 0 || x > width) continue;
+        ctx.moveTo(x, 0); ctx.lineTo(x, height);
+      }
+      for (let offset = 0; offset < rows; offset++) {
+        const index = firstY + offset;
+        if ((index % 5 === 0) !== major) continue;
+        const y = align(screen({ x: 0, y: index * spacing }).y);
+        if (y < 0 || y > height) continue;
+        ctx.moveTo(0, y); ctx.lineTo(width, y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   function paintEntities(space, onPaper = false, interactive = true, additions = null, viewport = null) {
     paintingPaper = onPaper;
     const { doc, width, height, selection, hover } = frame;
@@ -162,28 +199,7 @@ export function createSceneRenderer({ ctx, createCanvas = (w,h) => typeof Offscr
       else {
       ctx.fillStyle = activeSpace === "model" ? "#17292e" : "#dce1e3";
       ctx.fillRect(0, 0, width, height);
-      const step = gridSpacing(camera.scale),
-        tl = world({ x: 0, y: 0 }),
-        br = world({ x: width, y: height });
-      if (showGrid && !camera.rotation) {
-        ctx.save();
-        ctx.strokeStyle = activeSpace === "model" ? "#3b535b" : "#aab5bc";
-        ctx.lineWidth = 0.6;
-        ctx.setLineDash([]);
-        ctx.beginPath();
-        for (let x = Math.ceil(tl.x / step) * step; x < br.x; x += step) {
-          const p = screen({ x, y: 0 });
-          ctx.moveTo(p.x, 0);
-          ctx.lineTo(p.x, height);
-        }
-        for (let y = Math.ceil(br.y / step) * step; y < tl.y; y += step) {
-          const p = screen({ x: 0, y });
-          ctx.moveTo(0, p.y);
-          ctx.lineTo(width, p.y);
-        }
-        ctx.stroke();
-        ctx.restore();
-      }
+      if (showGrid && !camera.rotation) paintGrid();
       if (activeSpace === "model") {
         // World axes stay visible without the grid and use screen-pixel widths.
         const origin = screen({ x: 0, y: 0 });

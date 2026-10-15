@@ -210,7 +210,9 @@ export function createPointerController({
       state.mouse,
       state.rawCursor,
       ev.shiftKey,
+      ev.timeStamp,
     );
+    state.drag.hitId = hit(state.rawCursor)?.id || null;
   }
   function pointermove(ev) {
     setTrimShift(ev.shiftKey);
@@ -227,7 +229,7 @@ export function createPointerController({
     } else if (state.drag?.kind === "trimSweep")
       dispatchEditor({ type: "sweepMove" });
     else if (state.drag?.kind === "select")
-      state.drag = moveSelectionGesture(state.drag, state.mouse);
+      state.drag = moveSelectionGesture(state.drag, state.mouse, ev.timeStamp);
     else if (state.drag?.kind === "viewportMove")
       state.drag.moved = dist(state.mouse, state.drag.start) > 4;
     else if (!state.tool && !state.drag) {
@@ -243,6 +245,8 @@ export function createPointerController({
   }
   function pointerup(ev) {
     if (!state.drag) return;
+    // Between clicks, only a new pointerdown can arm completion.
+    if (state.drag.kind === "select" && state.drag.phase === "corner") return;
     moveCursor(ev);
     if (state.drag.kind === "trimSweep") {
       setTrimShift(ev.shiftKey);
@@ -272,6 +276,7 @@ export function createPointerController({
         state.drag.moved || state.drag.phase === "finish"
           ? null
           : hit(state.rawCursor)?.id,
+        ev.timeStamp,
       );
       if (action.kind === "pending") {
         state.drag = action.gesture;

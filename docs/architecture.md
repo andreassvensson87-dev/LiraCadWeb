@@ -219,6 +219,12 @@ som godkänd modell.
 emot presentationseffekter som callbacks. `ui/space-tabs.js` presenterar
 modell/layout; `editor/layout-controller.js` styr deras beteende.
 
+Markeringsfönstrets preview är skild från avslutningen. Ett kort första klick
+låser första hörnet även om musen hinner röra sig långt under klicket. Rutan
+följer sedan pekaren tills nästa tryck/släpp väljer andra hörnet. Ett hållet
+drag (minst 250 ms) kan avslutas vid släpp. Pointerup utan ett nytt tryck får
+inte avsluta ett redan väntande klick–klick-fönster.
+
 Inspektorns kontroller skickar egenskapspatchar eller avsikter till
 `editor/property-controller.js`, `editor/entity-edit-controller.js` och
 `editor/inspector-actions.js`. Lager-/layout-/blockregler och validerade

@@ -140,3 +140,36 @@ test('sweep hides all staged originals and invalidates the background cache as t
  f.previewTargets=[];f.previews=[];
  c.calls.length=0;render(f);assert.equal(copies,4);assert.equal(c.calls.filter(([name])=>name==='stroke').length,2);
 });
+
+test('adaptive grid draws pixel-aligned subdivisions and major lines without changing document or snap spacing', () => {
+  const f = frame(), c = canvas(), render = createSceneRenderer(c);
+  f.showGrid = true;
+  f.camera = {x: -13, y: 17, scale: 1};
+  const before = structuredClone(f);
+  render(f);
+  const strokes = c.calls.filter(([name]) => name === 'stroke');
+  assert.equal(strokes.length, 2);
+  assert.notEqual(strokes[0].at(-1).strokeStyle, strokes[1].at(-1).strokeStyle);
+  assert.ok(strokes.every(call => call.at(-1).lineWidth * f.dpr === 1));
+  const verticals = c.calls.filter(([name,,y]) => name === 'moveTo' && y === 0);
+  for (const [,x] of verticals) assert.equal((x * f.dpr) % 1, .5);
+  const majors = verticals.filter(call => call.at(-1).strokeStyle === strokes[1].at(-1).strokeStyle);
+  assert.equal(majors[1][1] - majors[0][1], gridSpacing(f.camera.scale));
+  assert.ok(verticals.length > majors.length * 3);
+  assert.deepEqual(f, before);
+  assert.equal(c.stack.length, 0);
+  c.calls.length = 0;
+  render({...f, showGrid: false});
+  assert.equal(c.calls.filter(([name]) => name === 'stroke').length, 0);
+});
+
+test('selection rectangle is painted during movement before the gesture is released', () => {
+  const f = frame(), c = canvas(), render = createSceneRenderer(c), before = structuredClone(f.doc);
+  f.drag = {kind:'select',phase:'pressed',start:{x:180,y:180},world:{x:0,y:0},moved:true};
+  f.mouse = {x:40,y:60};
+  render(f);
+  assert.ok(c.calls.some(([name,x,y,w,h]) => name === 'strokeRect' && x === 180 && y === 180 && w === -140 && h === -120));
+  assert.ok(c.calls.some(([name,dash]) => name === 'setLineDash' && dash[0] === 5 && dash[1] === 3));
+  assert.deepEqual(f.doc, before);
+  assert.equal(f.selection.size, 0);
+});
