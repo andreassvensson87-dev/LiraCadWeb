@@ -45,6 +45,7 @@ export function installInputController({
   saveProject,
   toggle,
   erase,
+  clipboard,
 }) {
   const pointer = createPointerController({
     state,
@@ -153,6 +154,11 @@ export function installInputController({
     }
     if (editing && ev.target !== input) return;
     const mod = ev.metaKey || ev.ctrlKey;
+    if (mod && !ev.altKey && !editing && ["c", "x", "v"].includes(ev.key.toLowerCase())) {
+      ev.preventDefault();
+      if (!ev.repeat) clipboard[{ c: "copy", x: "cut", v: "paste" }[ev.key.toLowerCase()]]();
+      return;
+    }
     if (mod && ev.key.toLowerCase() === "z") {
       ev.preventDefault();
       undo(ev.shiftKey);

@@ -18,6 +18,7 @@ import { createCreationSettings } from "./editor/creation-settings.js";
 import { createToolContext } from "./editor/tool-context.js";
 import { createSaveController } from "./app/save-controller.js";
 import { createEntityEditController } from "./editor/entity-edit-controller.js";
+import { createClipboardController } from "./editor/clipboard-controller.js";
 import { createProjectController } from "./app/project-controller.js";
 import { createBlockController } from "./app/block-controller.js";
 import { createSelectionController } from "./editor/selection-controller.js";
@@ -210,6 +211,7 @@ export async function createCadApplication() {
     visible,
     hit,
     getDocumentWorkflow: () => documentWorkflow,
+    getClipboardController: () => clipboard,
     commit,
     applyObjectChange,
     addEntities,
@@ -896,6 +898,16 @@ export async function createCadApplication() {
     gridStep,
     world,
   });
+  const clipboard = createClipboardController({
+    model, state, selectedEntities, drawingSpace,
+    getDocumentEditor: () => documentEditor, cancel, update, log,
+    prepare: () => !!projectWorkspace.active && (!textEditor.active || finishTextEdit(true)),
+    startPlacement: (context) => {
+      editor.start("PASTECLIP", context);
+      prompt();
+      canvas.focus();
+    },
+  });
   const { commandCompletion, movedViewport } = installInputController({
     document,
     window,
@@ -939,8 +951,10 @@ export async function createCadApplication() {
     saveProject,
     toggle,
     erase,
+    clipboard,
   });
   const workspaceBindings = createWorkspaceBindings({
+    clipboard,
     document,
     newDrawing: (...args) => importController.newDrawing(...args),
     openDemo: (...args) => importController.openDemo(...args),

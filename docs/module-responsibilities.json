@@ -602,5 +602,13 @@
   "workers/dxf-import-worker.js": {
     "layer": "workers",
     "responsibility": "Isolerad worker för DXF-konvertering och resultatmeddelanden."
+  },
+  "tools/clipboard-tools.js": {
+    "layer": "tools",
+    "responsibility": "Äger inklistringens punktinmatning och isolerade förhandsvisning före validerad dokumenttransaktion."
+  },
+  "editor/clipboard-controller.js": {
+    "layer": "editor",
+    "responsibility": "Äger appens objekturklipp och transaktioner för kopiera, klipp ut och klistra in mellan ritningssessioner."
   }
 }

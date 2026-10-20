@@ -11,6 +11,7 @@ import { blockTools } from "../tools/block-tools.js";
 import { viewportTools } from "../tools/viewport-tools.js";
 import { annotationTools } from "../tools/annotation-tools.js";
 import { utilityTools } from "../tools/utility-tools.js";
+import { clipboardTools } from "../tools/clipboard-tools.js";
 
 // Tools depend on isolated context, never on UI or storage.
 export function createEditorTools() {
@@ -28,5 +29,6 @@ export function createEditorTools() {
     ...viewportTools,
     ...annotationTools,
     ...utilityTools,
+    ...clipboardTools,
   };
 }

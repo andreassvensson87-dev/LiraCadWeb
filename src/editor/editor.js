@@ -25,9 +25,9 @@ export class Editor {
   owns(state) {
     return this.state !== null && this.state === state;
   }
-  start(name) {
+  start(name, initialContext = {}) {
     if (!this.supports(name)) return false;
-    this.state = this.tools[name].create({ ...structuredClone(this.getContext()), defaults: structuredClone(this.defaults[name]) });
+    this.state = this.tools[name].create({ ...structuredClone(this.getContext()), ...structuredClone(initialContext), defaults: structuredClone(this.defaults[name]) });
     this.onState(this.state);
     return true;
   }

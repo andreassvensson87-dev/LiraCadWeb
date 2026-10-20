@@ -22,6 +22,7 @@ export function createWorkspaceBindings({
   getFileOpenQueue,
   createLayout,
   leaveViewport,
+  clipboard,
 }) {
   $("#navigation-device").addEventListener("change", () => {
     try {
@@ -36,6 +37,8 @@ export function createWorkspaceBindings({
   document.addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-command]");
     if (b) start(b.dataset.command);
+    const clipboardButton = ev.target.closest("[data-clipboard]");
+    if (clipboardButton) clipboard[clipboardButton.dataset.clipboard]();
   });
   $("#fit-view").onclick = fit;
   $("#toggle-grid").classList.toggle("active", state.showGrid);

@@ -26,6 +26,24 @@ export function installRibbon({ document }) {
     }
   }
 
+  const clipboard = document.createElement("section");
+  clipboard.className = "toolbar-section";
+  clipboard.setAttribute("aria-label", "Urklipp mellan ritningar");
+  clipboard.innerHTML = '<h3>Urklipp</h3>';
+  for (const [action, label, key, path] of [
+    ["copy", "Kopiera till urklipp", "C", '<rect x="8" y="8" width="12" height="13"/><path d="M16 8V3H3v13h5"/>'],
+    ["cut", "Klipp ut", "X", '<circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="m4 3 12 12M20 3 8 15"/>'],
+    ["paste", "Klistra in", "V", '<path d="M8 5H4v16h16V5h-4"/><rect x="8" y="2" width="8" height="6"/>'],
+  ]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.clipboard = action;
+    button.title = `${label} mellan ritningsflikar · Ctrl/⌘+${key}`;
+    button.innerHTML = `<span class="tool-icon"><svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg></span><span>${label}</span>`;
+    clipboard.append(button);
+  }
+  $('[data-tool-panel="edit"]').prepend(clipboard);
+
   const tabs = $$("[data-ribbon]");
   const tablist = tabs[0].parentElement;
   tablist.setAttribute("role", "tablist");

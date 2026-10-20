@@ -22,6 +22,7 @@ export function createToolContext({
   visible,
   hit,
   getDocumentWorkflow,
+  getClipboardController,
   commit,
   applyObjectChange,
   addEntities,
@@ -106,7 +107,9 @@ export function createToolContext({
       state.selection = new Set(ids);
     },
     applyChange: (change) => {
-      if (change.kind === "wblock") {
+      if (change.kind === "clipboard") {
+        getClipboardController().place(change);
+      } else if (change.kind === "wblock") {
         getDocumentWorkflow().exportWblock(change);
       } else if (change.kind === "blockParameter") {
         if (!model.blockEditor) throw Error("Öppna blockeditorn först.");

@@ -183,3 +183,8 @@ Enkla fältadaptrar kan skapa en kopierad egenskapspatch och skicka den till edi
 - Native DWG-bryggans egna källfiler har granskats för ansvar; de och dess genererade runtime har inte ändrats eller byggts om i denna refaktorering.
 
 Publicering sker via GitHub Actions till GitHub Pages efter godkänd byggning och verifiering.
+
+| Modul | Ansvar |
+| --- | --- |
+| `src/editor/clipboard-controller.js` | Äger appens objekturklipp och transaktioner för kopiera, klipp ut och klistra in mellan ritningssessioner. |
+| `src/tools/clipboard-tools.js` | Äger inklistringens punktinmatning och isolerade förhandsvisning före validerad dokumenttransaktion. |

@@ -364,3 +364,12 @@ ligger i egna appcontrollerer. Redigeringsreglerna ligger hos sina editorcontrol
 DXF-exportens lager innehåller gruppkod 390 med hänvisning till standardplotstilen
 `Normal`. `io/dxf-layout.js` äger dess objekt, dictionary, klassdeklarationer och
 gemensamma handle-allokering.
+
+## Urklipp mellan ritningsflikar
+
+`editor/clipboard-controller.js` äger ett gemensamt urklipp per appinstans.
+Godkända objekt kopieras från den aktiva sessionen; inklistring använder målprojektets
+DocumentEditor. Lager, block och ID mappas om utan att ändra källritningen.
+`tools/clipboard-tools.js` förhandsvisar fristående data och placerar med klick eller
+koordinater i en transaktion. Esc och flikbyte avbryter placeringen.
+UI binder Ctrl/⌘+C/X/V och Ändra → Urklipp; textfält behåller normalt urklipp.
