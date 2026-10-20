@@ -355,3 +355,7 @@ Beroendena är acykliska. Modell, verktyg och editorcontrollerer får inte impor
 UI-skalet eller browserlagring. `src/cad-application.js` innehåller fortfarande
 instanskopplingar och uttryckliga effekter. Fil-/referensflöden och autosparning
 ligger i egna appcontrollerer. Redigeringsreglerna ligger hos sina editorcontrollerer.
+
+DXF-exportens lager innehåller gruppkod 390 med hänvisning till standardplotstilen
+`Normal`. `io/dxf-layout.js` äger dess objekt, dictionary, klassdeklarationer och
+gemensamma handle-allokering.

@@ -189,7 +189,7 @@
   },
   "io/dxf-layout.js": {
     "layer": "io",
-    "responsibility": "Serialiserar DXF-layout- och viewportdata."
+    "responsibility": "Serialiserar DXF-layoutdata, objektägarskap och standardplotstil."
   },
   "io/dxf-mleader.js": {
     "layer": "io",

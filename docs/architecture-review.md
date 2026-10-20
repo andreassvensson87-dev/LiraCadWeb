@@ -53,7 +53,7 @@ Genomgången omfattar appens egen JavaScript-kod fil för fil: exports, beroende
 | `src/io/dxf-export.js` | Konverterar CAD-modellen till DXF. |
 | `src/io/dxf-hatch.js` | Konverterar DXF-skraffering och dess slingor. |
 | `src/io/dxf-import.js` | Konverterar DXF-data till validerad CAD-modell. |
-| `src/io/dxf-layout.js` | Serialiserar DXF-layout- och viewportdata. |
+| `src/io/dxf-layout.js` | Serialiserar DXF-layoutdata, objektägarskap och standardplotstil. |
 | `src/io/dxf-mleader.js` | Konverterar DXF multileader-geometri. |
 | `src/io/dxf-text.js` | Tolkar CAD-fontnamn och MTEXT-kontrollkoder. |
 | `src/io/file-import.js` | Läser projektfiler eller startar formatworker och validerar resultat. |

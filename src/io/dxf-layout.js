@@ -4,7 +4,9 @@ export function dxfLayouts(doc, pair, custom = []) {
   const handle = () => (next++).toString(16).toUpperCase();
   const root = handle(),
     dictionary = handle(),
-    table = handle();
+    table = handle(),
+    plotDictionary = handle(),
+    plotStyle = handle();
   const layouts = [
     { id: "model", name: "Model", width: 420, height: 297 },
     ...(doc.layouts?.length
@@ -27,6 +29,24 @@ export function dxfLayouts(doc, pair, custom = []) {
     e._owner ||
     layouts.find((l) => l.id === (e.space || "model"))?.record ||
     layouts[0].record;
+  const classes = () => {
+    pair(0, "SECTION");
+    pair(2, "CLASSES");
+    for (const [name, cpp] of [
+      ["ACDBDICTIONARYWDFLT", "AcDbDictionaryWithDefault"],
+      ["ACDBPLACEHOLDER", "AcDbPlaceHolder"],
+    ]) {
+      pair(0, "CLASS");
+      pair(1, name);
+      pair(2, cpp);
+      pair(3, "ObjectDBX Classes");
+      pair(90, 0);
+      pair(91, 1);
+      pair(280, 0);
+      pair(281, 0);
+    }
+    pair(0, "ENDSEC");
+  };
   const tables = () => {
     pair(0, "TABLE");
     pair(2, "BLOCK_RECORD");
@@ -83,6 +103,20 @@ export function dxfLayouts(doc, pair, custom = []) {
     pair(281, 1);
     pair(3, "ACAD_LAYOUT");
     pair(350, dictionary);
+    pair(3, "ACAD_PLOTSTYLENAME");
+    pair(350, plotDictionary);
+    pair(0, "ACDBDICTIONARYWDFLT");
+    pair(5, plotDictionary);
+    pair(330, root);
+    pair(100, "AcDbDictionary");
+    pair(281, 1);
+    pair(3, "Normal");
+    pair(350, plotStyle);
+    pair(100, "AcDbDictionaryWithDefault");
+    pair(340, plotStyle);
+    pair(0, "ACDBPLACEHOLDER");
+    pair(5, plotStyle);
+    pair(330, plotDictionary);
     pair(0, "DICTIONARY");
     pair(5, dictionary);
     pair(330, root);
@@ -135,5 +169,5 @@ export function dxfLayouts(doc, pair, custom = []) {
     }
     pair(0, "ENDSEC");
   };
-  return { handle, owner, tables, blocks, objects };
+  return { handle, owner, plotStyle, classes, tables, blocks, objects };
 }

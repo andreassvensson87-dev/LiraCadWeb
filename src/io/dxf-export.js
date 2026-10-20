@@ -109,6 +109,7 @@ export function toDXF(doc) {
   point({x:0,y:0});
   pair(30, 0);
   pair(0, "ENDSEC");
+  layouts.classes();
   pair(0, "SECTION");
   pair(2, "TABLES");
   const lineTable = layouts.handle();
@@ -163,6 +164,8 @@ export function toDXF(doc) {
     pair(6, lineTypeName(l) || "CONTINUOUS");
     pair(290,l.plot===false?0:1);
     if (l.lineWeight != null) pair(370, Math.round(l.lineWeight * 100));
+    // AutoCAD requires a PlotStyleName handle even for color-dependent plots.
+    pair(390, layouts.plotStyle);
   }
   pair(0, "ENDTAB");
   pair(0,"TABLE");pair(2,"APPID");pair(5,layouts.handle());pair(100,"AcDbSymbolTable");pair(70,1);
