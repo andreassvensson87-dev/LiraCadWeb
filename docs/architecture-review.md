@@ -151,7 +151,7 @@ Genomgången omfattar appens egen JavaScript-kod fil för fil: exports, beroende
 | `src/ui/text-editor.js` | DOM-adapter för textutkastets kontroller, popup och fokus. |
 | `src/ui/toolbar-groups.js` | Presentationens verktygsgrupper och rubriker. |
 | `src/ui/toolbar-icons.js` | SVG-symboler för verktygsmenyn. |
-| `src/ui/update-ui.js` | Presenterar och samordnar användarens appuppdatering. |
+| `src/ui/update-ui.js` | Samordnar automatisk och manuell uppdateringskontroll samt skyddad appuppdatering. |
 | `src/ui/wblock-dialog.js` | Presenterar exportval och hanterar dialogens inmatning. |
 | `src/ui/workspace-bindings.js` | Binder arbetsytans knappar och fliknavigation till actions. |
 | `src/ui/workspace-view.js` | Visar status, arbetsytans tomläge och logg; webbläsarens fil-/downloadadapter. |

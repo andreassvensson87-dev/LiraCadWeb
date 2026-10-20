@@ -590,3 +590,7 @@ body.cad-workspace #properties-panel .subtle-button {
   margin: 4px 0;
   max-width: 100%;
 }
+/* Settings share the app's compact action rows. */
+.settings-update-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+#settings-update-app[hidden] { display: none; }
+#settings-update-status { min-height: 22px; }

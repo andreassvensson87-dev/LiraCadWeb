@@ -299,6 +299,11 @@ toppraden uppmanar att invänta autosparning. Mycket stora ändringsposter kan
 omladdning. Blockutkast loggas inte.
 Appuppdatering väntar på bekräftad sparning
 och hindrar redigering medan den sparningen pågår. Blockutkast autosparas inte.
+Inställningarnas manuella uppdateringskontroll binds av `ui/pwa.js` och ägs av
+`ui/update-ui.js`. Den söker via registreringens `update()`, inväntar installation
+och skiljer senaste version från nätverksfel, installationsfel och timeout.
+Uppdateringen aktiveras först med ett separat knapptryck som använder samma
+sparskydd som toppradens uppdateringsknapp.
 
 Toppraden visar sparstatus och ett förklarande fel vid misslyckande. Vid
 oläsbart utkast eller otillgänglig lagring kan fortsatt arbete sparas till fil.

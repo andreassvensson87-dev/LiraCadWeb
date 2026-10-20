@@ -581,7 +581,7 @@
   },
   "ui/update-ui.js": {
     "layer": "ui",
-    "responsibility": "Presenterar och samordnar användarens appuppdatering."
+    "responsibility": "Samordnar automatisk och manuell uppdateringskontroll samt skyddad appuppdatering."
   },
   "ui/wblock-dialog.js": {
     "layer": "ui",
